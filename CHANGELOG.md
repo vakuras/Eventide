@@ -2,6 +2,12 @@
 
 All notable changes to DeepSky are documented here.
 
+## [0.8.1] - 2026-03-06
+
+### Fixed
+- Auto-update now correctly resolves releases from the new repository location (itsela_microsoft/DeepSky)
+- Update check no longer errors with XML parse failure when checking for new versions
+
 ## [0.8.0] - 2026-03-04
 
 ### Added
