@@ -13,6 +13,7 @@
   <div id="titlebar">
     <span class="titlebar-text" id="titlebar-home" title="Home">DeepSky</span>
     <div class="titlebar-actions">
+      <button id="btn-feedback" title="Feedback">✎</button>
       <button id="btn-notifications" title="Alerts">⚐<span id="notification-badge" class="notification-badge hidden">0</span></button>
       <button id="btn-instructions" title="Instructions">☰</button>
       <button id="btn-settings" title="Settings">⚙</button>
@@ -158,6 +159,30 @@
           <div id="about-changelog" class="about-changelog"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Feedback dropdown -->
+  <div id="feedback-panel" class="feedback-panel hidden">
+    <div class="feedback-panel-header">
+      <span>Feedback</span>
+      <button id="btn-close-feedback" class="notification-panel-actions btn-icon">×</button>
+    </div>
+    <div class="feedback-panel-body">
+      <button id="btn-report-bug" class="feedback-action">
+        <span class="feedback-action-icon">🐛</span>
+        <div class="feedback-action-text">
+          <div class="feedback-action-title">Report a Bug</div>
+          <div class="feedback-action-desc">Something isn't working as expected</div>
+        </div>
+      </button>
+      <button id="btn-request-feature" class="feedback-action">
+        <span class="feedback-action-icon">💡</span>
+        <div class="feedback-action-text">
+          <div class="feedback-action-title">Request a Feature</div>
+          <div class="feedback-action-desc">Suggest an idea or improvement</div>
+        </div>
+      </button>
     </div>
   </div>
 

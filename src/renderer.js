@@ -2,6 +2,7 @@ const { Terminal } = require('@xterm/xterm');
 const { FitAddon } = require('@xterm/addon-fit');
 const { WebLinksAddon } = require('@xterm/addon-web-links');
 const { deriveSessionState } = require('./session-state');
+const { createTerminalKeyHandler } = require('./keyboard-shortcuts');
 
 // State
 const terminals = new Map();
@@ -90,6 +91,7 @@ const btnToggleStatus = document.getElementById('btn-toggle-status');
 const notificationBadge = document.getElementById('notification-badge');
 const notificationPanel = document.getElementById('notification-panel');
 const notificationListEl = document.getElementById('notification-list');
+const feedbackPanel = document.getElementById('feedback-panel');
 const toastContainer = document.getElementById('toast-container');
 
 const titlebar = document.getElementById('titlebar');
@@ -355,7 +357,18 @@ async function init() {
         !e.target.closest('#btn-notifications')) {
       notificationPanel.classList.add('hidden');
     }
+    if (!feedbackPanel.classList.contains('hidden') &&
+        !feedbackPanel.contains(e.target) &&
+        !e.target.closest('#btn-feedback')) {
+      feedbackPanel.classList.add('hidden');
+    }
   });
+
+  // Feedback
+  document.getElementById('btn-feedback').addEventListener('click', toggleFeedbackPanel);
+  document.getElementById('btn-close-feedback').addEventListener('click', () => feedbackPanel.classList.add('hidden'));
+  document.getElementById('btn-report-bug').addEventListener('click', () => openFeedbackIssue('bug'));
+  document.getElementById('btn-request-feature').addEventListener('click', () => openFeedbackIssue('feature'));
 
   ipcCleanups.push(window.api.onNotification((notification) => {
     showToast(notification);
@@ -621,7 +634,11 @@ function createSessionItem(session, group) {
   }
 
   const lastUsedTime = sessionLastUsed.get(session.id);
-  const timeStr = new Date(lastUsedTime || session.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const lastUsedDate = new Date(lastUsedTime || session.updatedAt);
+  const isToday = lastUsedDate.toDateString() === new Date().toDateString();
+  const timeStr = isToday
+    ? lastUsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    : lastUsedDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + lastUsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
   let tagsHtml = '';
   const allPills = [];
@@ -742,7 +759,8 @@ function renderSessionList() {
       displayed.sort((a, b) => (sessionLastUsed.get(b.id) || 0) - (sessionLastUsed.get(a.id) || 0));
     }
   } else {
-    displayed = allSessions;
+    displayed = [...allSessions];
+    displayed.sort((a, b) => (sessionLastUsed.get(b.id) || 0) - (sessionLastUsed.get(a.id) || 0));
   }
 
   // Filter by search (title + tags + resources)
@@ -844,20 +862,7 @@ function renderSessionList() {
     }
   } else {
     // Original rendering (history tab or search active)
-    let lastDateLabel = '';
     for (const session of displayed) {
-      if (currentSidebarTab === 'history') {
-        const lastUsedTs = sessionLastUsed.get(session.id);
-        const dateLabel = getDateLabel(lastUsedTs ? new Date(lastUsedTs).toISOString() : session.updatedAt);
-        if (dateLabel !== lastDateLabel) {
-          const groupEl = document.createElement('div');
-          groupEl.className = 'session-date-group';
-          groupEl.textContent = dateLabel;
-          sessionList.appendChild(groupEl);
-          lastDateLabel = dateLabel;
-        }
-      }
-
       const el = createSessionItem(session, null);
       sessionList.appendChild(el);
     }
@@ -1109,45 +1114,8 @@ function createTerminal(sessionId) {
     }, true);
   }
 
-  // Intercept paste shortcuts — xterm eats Ctrl+V / Cmd+V / Shift+Insert as raw control chars
-  // Also send CSI u sequence for Shift+Enter so the CLI can distinguish it from plain Enter
-  terminal.attachCustomKeyEventHandler((e) => {
-    if (e.type !== 'keydown') return true;
-    const mod = e.ctrlKey || e.metaKey;
-
-    // Let zoom shortcuts bubble to the document handler
-    if (mod && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) return false;
-
-    // Let Ctrl+T and Ctrl+N bubble to document handler for new session
-    if (mod && (e.key === 't' || e.key === 'n')) return false;
-
-    // Let Ctrl+Tab / Ctrl+Shift+Tab bubble for tab switching
-    if (e.ctrlKey && e.key === 'Tab') return false;
-
-    // Let Ctrl+W bubble for closing tabs
-    if (mod && e.key === 'w') return false;
-
-    // Let Ctrl+I bubble for status panel toggle
-    if (mod && e.key === 'i') return false;
-
-    // Ctrl+C with a selection → copy to clipboard instead of sending SIGINT
-    if (mod && e.key === 'c' && terminal.hasSelection()) {
-      e.preventDefault();
-      window.api.copyText(terminal.getSelection());
-      terminal.clearSelection();
-      return false;
-    }
-
-    const isPaste = (mod && e.key === 'v') || (e.shiftKey && e.key === 'Insert');
-    if (isPaste) {
-      e.preventDefault();
-      window.api.pasteText().then(text => {
-        if (text) window.api.writePty(sessionId, text);
-      });
-      return false;
-    }
-    return true;
-  });
+  // Intercept shortcuts — handles copy, paste, word-delete, newline, and bubbles app-level shortcuts
+  terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(sessionId, terminal, window.api));
 
   terminals.set(sessionId, { terminal, fitAddon, wrapper });
 }
@@ -2273,9 +2241,42 @@ btnClearDefaultWorkdir.addEventListener('click', () => {
 async function toggleNotificationPanel() {
   const wasHidden = notificationPanel.classList.contains('hidden');
   notificationPanel.classList.toggle('hidden');
+  feedbackPanel.classList.add('hidden');
   if (wasHidden) {
     await window.api.markAllNotificationsRead();
     await refreshNotifications();
+  }
+}
+
+function toggleFeedbackPanel() {
+  notificationPanel.classList.add('hidden');
+  feedbackPanel.classList.toggle('hidden');
+}
+
+async function openFeedbackIssue(type) {
+  feedbackPanel.classList.add('hidden');
+  const version = await window.api.getVersion();
+  const repoBase = 'https://github.com/itsela-ms/DeepSky/issues/new';
+
+  if (type === 'bug') {
+    const title = encodeURIComponent('[Bug] ');
+    const body = encodeURIComponent(
+      `**DeepSky Version:** v${version}\n\n` +
+      `**Describe the bug:**\n<!-- A clear description of what the bug is. -->\n\n` +
+      `**Steps to reproduce:**\n1. \n2. \n3. \n\n` +
+      `**Expected behavior:**\n\n` +
+      `**Actual behavior:**\n`
+    );
+    window.api.openExternal(`${repoBase}?labels=bug&title=${title}&body=${body}`);
+  } else {
+    const title = encodeURIComponent('[Feature] ');
+    const body = encodeURIComponent(
+      `**DeepSky Version:** v${version}\n\n` +
+      `**Feature Request:**\n<!-- A clear description of the feature you'd like. -->\n\n` +
+      `**Problem it solves:**\n\n` +
+      `**Proposed solution:**\n`
+    );
+    window.api.openExternal(`${repoBase}?labels=enhancement&title=${title}&body=${body}`);
   }
 }
 

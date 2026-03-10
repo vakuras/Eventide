@@ -2,6 +2,16 @@
 
 All notable changes to DeepSky are documented here.
 
+## [0.8.2] - 2026-03-09
+
+### Added
+- **Feedback button** — new `✎` button in the toolbar opens a panel with "Report a Bug" and "Request a Feature" options, each pre-filling a GitHub issue with version info and structured templates
+
+### Changed
+- **Session timestamps** — sessions older than today now show the date (e.g. "Dec 12 14:30") instead of just the time, making history easier to navigate
+- **History list** — removed date group headers ("Today", "Yesterday", etc.) for a cleaner, less cluttered session list
+- **History sorting** — history tab now sorts sessions by most recently used first
+
 ## [0.8.1] - 2026-03-07
 
 ### Fixed

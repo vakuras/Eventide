@@ -1350,6 +1350,92 @@ body {
 .notification-item:hover .notification-dismiss { opacity: 1; }
 .notification-dismiss:hover { color: var(--text); background: var(--bg-hover); }
 
+/* Feedback button */
+#btn-feedback {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#btn-feedback:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Feedback panel */
+.feedback-panel {
+  position: fixed;
+  top: 40px;
+  right: 195px;
+  width: 300px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  z-index: 300;
+  overflow: hidden;
+}
+.feedback-panel.hidden { display: none; }
+
+.feedback-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.feedback-panel-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feedback-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  transition: all 0.15s;
+  width: 100%;
+}
+.feedback-action:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+.feedback-action-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+.feedback-action-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.feedback-action-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
 /* Session badge in sidebar */
 .session-notification-badge {
   background: var(--red, #f38ba8);
