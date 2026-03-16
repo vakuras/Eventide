@@ -672,8 +672,7 @@ async function init() {
   settingsOverlay.querySelector('.settings-close').addEventListener('click', closeSettings);
   settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings(); });
 
-  // Update button
-  document.getElementById('btn-check-update').addEventListener('click', () => window.api.checkForUpdates());
+  // Update status listener (auto-update only, no manual button)
   ipcCleanups.push(window.api.onUpdateStatus(handleUpdateStatus));
 
   // Theme switcher
@@ -827,22 +826,18 @@ function handleUpdateStatus(data) {
   const statusEl = document.getElementById('update-status');
   const progressEl = document.getElementById('update-progress');
   const progressBar = document.getElementById('update-progress-bar');
-  const btnCheck = document.getElementById('btn-check-update');
 
   statusEl.classList.remove('hidden');
   progressEl.classList.add('hidden');
-  btnCheck.disabled = false;
 
   switch (data.status) {
     case 'checking':
       statusEl.textContent = 'Checking for updates…';
-      btnCheck.disabled = true;
       break;
     case 'available':
       statusEl.textContent = `Downloading v${data.info?.version}…`;
       statusEl.className = 'update-status';
       setUpdateBadge(true, data.info?.version, false);
-      btnCheck.disabled = true;
       break;
     case 'not-available':
       statusEl.textContent = 'You\'re on the latest version.';
@@ -853,7 +848,6 @@ function handleUpdateStatus(data) {
       statusEl.textContent = `Downloading… ${Math.round(data.progress?.percent || 0)}%`;
       progressEl.classList.remove('hidden');
       progressBar.style.width = `${data.progress?.percent || 0}%`;
-      btnCheck.disabled = true;
       break;
     case 'downloaded':
       statusEl.textContent = `v${data.info?.version} will be installed on next quit.`;
@@ -1950,6 +1944,14 @@ function showSessionContextMenu(e, sessionId) {
   const items = [];
 
   items.push({
+    label: 'Rename',
+    action: () => {
+      const el = sessionList.querySelector(`.session-item[data-session-id="${sessionId}"] .session-title`);
+      if (el) startRenameSession(sessionId, el);
+    },
+  });
+
+  items.push({
     label: 'Add to new group',
     action: () => {
       if (group) removeTabFromGroupSilent(sessionId);
@@ -2060,12 +2062,16 @@ function toggleStatusPanel() {
   btnToggleStatus.classList.toggle('active', !collapsed);
   if (!collapsed && activeSessionId) updateStatusPanel(activeSessionId);
   // Refit terminal once the CSS width transition actually finishes
+  let fitted = false;
   statusPanel.addEventListener('transitionend', function onEnd(e) {
     if (e.propertyName === 'width') {
       statusPanel.removeEventListener('transitionend', onEnd);
+      fitted = true;
       fitActiveTerminal();
     }
   });
+  // Fallback if transitionend doesn't fire (e.g. transition disabled or instant)
+  setTimeout(() => { if (!fitted) fitActiveTerminal(); }, 350);
 }
 
 // Section expand/collapse state
@@ -2891,7 +2897,12 @@ async function applyZoom(direction) {
   await window.api.setZoom(direction);
   syncTitlebarPadding();
   // Small delay lets Electron apply the new factor before we refit
-  setTimeout(() => { for (const { fitAddon } of terminals.values()) try { fitAddon.fit(); } catch {} }, 100);
+  setTimeout(() => {
+    for (const { terminal, fitAddon } of terminals.values()) {
+      try { fitAddon.fit(); } catch {}
+      try { terminal.scrollToBottom(); } catch {}
+    }
+  }, 100);
 }
 
 // Ctrl+Scroll zoom

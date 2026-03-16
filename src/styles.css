@@ -1415,6 +1415,10 @@ body {
   overflow-y: auto;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
 }
+.settings-modal::-webkit-scrollbar { width: 6px; }
+.settings-modal::-webkit-scrollbar-track { background: transparent; }
+.settings-modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.settings-modal::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
 .settings-modal-header {
   display: flex;
@@ -2503,6 +2507,33 @@ button:focus-visible, .tab:focus-visible, .session-item:focus-visible {
 .about-changelog::-webkit-scrollbar { width: 4px; }
 .about-changelog::-webkit-scrollbar-track { background: transparent; }
 .about-changelog::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Keyboard Shortcuts table */
+.shortcuts-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.shortcut-action {
+  color: var(--text-dim);
+}
+.shortcut-row kbd {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--text);
+  white-space: nowrap;
+}
 
 /* Update section */
 .update-section {

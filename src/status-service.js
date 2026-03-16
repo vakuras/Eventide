@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
+const MAX_NEXT_STEP_WORDS = 6;
+const TRAILING_FILLER_WORDS = new Set(['a', 'an', 'and', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'the', 'to', 'with']);
+
 class StatusService {
   constructor(sessionStateDir) {
     this.sessionStateDir = sessionStateDir;
@@ -130,12 +133,17 @@ class StatusService {
         const todoMatch = line.match(/^\s*[-*]\s+\[\s?\]\s+(.+)/);
 
         if (doneMatch) {
-          items.push({ text: doneMatch[1].trim(), done: true, current: false });
+          const text = this._summarizeNextStep(doneMatch[1]);
+          if (text) {
+            items.push({ text, done: true, current: false });
+          }
         } else if (todoMatch) {
+          const text = this._summarizeNextStep(todoMatch[1]);
+          if (!text) continue;
+
           const isCurrent = !foundFirstUnchecked;
           foundFirstUnchecked = true;
-          items.push({ text: todoMatch[1].trim(), done: false, current: isCurrent });
-          if (isCurrent) foundFirstUnchecked = true;
+          items.push({ text, done: false, current: isCurrent });
         }
       }
 
@@ -145,7 +153,10 @@ class StatusService {
         for (const line of lines) {
           const m = line.match(numberedRe);
           if (m) {
-            items.push({ text: m[2].trim(), done: false, current: items.length === 0 });
+            const text = this._summarizeNextStep(m[2]);
+            if (text) {
+              items.push({ text, done: false, current: items.length === 0 });
+            }
           }
         }
       }
@@ -154,6 +165,29 @@ class StatusService {
     } catch {
       return [];
     }
+  }
+
+  _summarizeNextStep(text) {
+    const cleaned = String(text || '')
+      .replace(/`+/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleaned) return '';
+
+    const words = cleaned.split(' ').filter(Boolean);
+    if (words.length <= MAX_NEXT_STEP_WORDS) {
+      return cleaned;
+    }
+
+    const shortened = words.slice(0, MAX_NEXT_STEP_WORDS);
+    while (shortened.length > 1 && TRAILING_FILLER_WORDS.has(shortened[shortened.length - 1].toLowerCase())) {
+      shortened.pop();
+    }
+
+    return shortened.join(' ');
   }
 
   /**

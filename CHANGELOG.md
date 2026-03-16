@@ -2,6 +2,26 @@
 
 All notable changes to DeepSky are documented here.
 
+## [0.8.5] - 2026-03-16
+
+### Added
+- **Sidebar collapse** — click the sidebar border to fully collapse (width 0) with an expand strip; drag to icon-mode at smaller widths
+- **Info bar** — structural bar below the terminal showing the session title and last prompt
+- **Restore closed tab** — `Ctrl+Shift+T` reopens the last closed session tab
+- **In-session search** — `Ctrl+F` opens buffer-only search with viewport sync and wrapped-line-aware matching
+- **Sidebar content search** — search across all session content from the sidebar search bar
+- **Session ID in status panel** — shows session ID with a copy button in the summary section
+- **Keyboard shortcuts in Settings** — new section showing all shortcuts with styled keycaps
+- **Rename from context menu** — right-click a session in the sidebar to rename it
+
+### Changed
+- **Themed scrollbar** — always-visible webkit scrollbar with Catppuccin styling
+- **Next steps truncation** — long plan step labels are summarized to 6 words for cleaner status panel display
+- **Zoom scroll fix** — terminal scrolls to bottom after zoom refit to prevent getting stuck
+
+### Removed
+- **"Check for Updates" button** — auto-update runs silently on startup and every 15 minutes; manual check no longer needed
+
 ## [0.8.4] - 2026-03-12
 
 ### Fixed

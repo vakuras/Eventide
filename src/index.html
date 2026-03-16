@@ -155,12 +155,35 @@
 
         <div class="settings-divider"></div>
 
+        <!-- Keyboard Shortcuts -->
+        <div class="settings-group">
+          <label class="settings-label">Keyboard Shortcuts</label>
+          <div id="shortcuts-table" class="shortcuts-table">
+            <div class="shortcut-row"><span class="shortcut-action">New session</span><kbd>Ctrl+N</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Close tab</span><kbd>Ctrl+W</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Restore closed tab</span><kbd>Ctrl+Shift+T</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Next tab</span><kbd>Ctrl+Tab</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Previous tab</span><kbd>Ctrl+Shift+Tab</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Toggle status panel</span><kbd>Ctrl+I</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Search in terminal</span><kbd>Ctrl+F</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Copy (with selection)</span><kbd>Ctrl+C</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Paste</span><kbd>Ctrl+V</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Delete word</span><kbd>Ctrl+Backspace</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Newline (no execute)</span><kbd>Shift+Enter</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Zoom in</span><kbd>Ctrl+=</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Zoom out</span><kbd>Ctrl+-</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Reset zoom</span><kbd>Ctrl+0</kbd></div>
+            <div class="shortcut-row"><span class="shortcut-action">Close / clear</span><kbd>Escape</kbd></div>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
         <!-- About -->
         <div class="settings-group">
           <label class="settings-label">About</label>
           <div id="about-version" class="about-version"></div>
           <div id="update-section" class="update-section">
-            <button id="btn-check-update" class="btn-secondary btn-update">Check for Updates</button>
             <div id="update-status" class="update-status hidden"></div>
             <div id="update-progress" class="update-progress hidden">
               <div id="update-progress-bar" class="update-progress-bar"></div>
