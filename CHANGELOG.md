@@ -2,6 +2,11 @@
 
 All notable changes to DeepSky are documented here.
 
+## [0.8.9] - 2026-03-23
+
+### Fixed
+- **Critical regression** — v0.8.6–0.8.8 introduced a bug that prevented active sessions from showing in the sidebar on startup; this release reverts to the last stable base (v0.8.5) and republishes as v0.8.9 so auto-update delivers the fix
+
 ## [0.8.5] - 2026-03-16
 
 ### Added

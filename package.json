@@ -1,6 +1,6 @@
 {
   "name": "deepsky",
-  "version": "0.8.5",
+  "version": "0.8.9",
   "description": "Your command center for GitHub Copilot CLI — manage, search, and switch between sessions from a sleek desktop app.",
   "main": "src/main.js",
   "author": "itsela-ms",
