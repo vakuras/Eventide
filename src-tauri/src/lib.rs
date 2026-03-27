@@ -20,6 +20,7 @@ use commands::{
         mark_all_notifications_read, dismiss_notification, clear_all_notifications,
     },
     instructions::{read_instructions, write_instructions},
+    app::{get_app_version, get_app_changelog},
 };
 
 use services::app_state::AppState;
@@ -71,6 +72,9 @@ pub fn run() {
             // Instructions
             read_instructions,
             write_instructions,
+            // App
+            get_app_version,
+            get_app_changelog,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Eventide");

@@ -1,6 +1,6 @@
 {
-  "name": "deepsky",
-  "version": "0.8.9",
+  "name": "eventide",
+  "version": "0.9.0",
   "description": "Your command center for GitHub Copilot CLI — manage, search, and switch between sessions from a sleek desktop app.",
   "main": "src/main.js",
   "author": "itsela-ms",
@@ -10,11 +10,13 @@
     "start": "npm run build && electron . --no-sandbox",
     "launch": "npm run build && wscript launch.vbs",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win",
+    "tauri:dev": "npm run build && npx tauri dev",
+    "tauri:build": "npm run build && npx tauri build"
   },
   "build": {
-    "appId": "com.itsela.deepsky",
-    "productName": "DeepSky",
+    "appId": "com.eventide.app",
+    "productName": "Eventide",
     "npmRebuild": false,
     "directories": {
       "output": "release"
@@ -27,7 +29,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "deepsky.ico"
+      "icon": "eventide.ico"
     },
     "nsis": {
       "oneClick": true,

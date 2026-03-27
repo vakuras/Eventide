@@ -4,10 +4,10 @@
   "version": "0.9.0",
   "identifier": "com.eventide.app",
   "build": {
-    "frontendDist": "../src",
+    "frontendDist": "..",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "beforeDevCommand": "npm run build",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
