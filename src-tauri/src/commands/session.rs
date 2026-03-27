@@ -1,6 +1,6 @@
 use tauri::State;
 use crate::services::app_state::AppState;
-use crate::services::session_service::{SessionInfo, SearchMatch};
+use crate::services::session_service::{SessionInfo, SearchResult};
 
 #[tauri::command]
 pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, String> {
@@ -10,7 +10,7 @@ pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, Str
 }
 
 #[tauri::command]
-pub fn search_sessions(state: State<'_, AppState>, query: String) -> Result<Vec<SearchMatch>, String> {
+pub fn search_sessions(state: State<'_, AppState>, query: String) -> Result<Vec<SearchResult>, String> {
     let guard = state.sessions.lock().map_err(|e| e.to_string())?;
     let svc = guard.as_ref().ok_or("Session service not initialized")?;
     svc.search_sessions(&query)
