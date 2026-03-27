@@ -51,6 +51,7 @@
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
     "electron": "^35.0.0",
     "electron-builder": "^26.7.0",
     "esbuild": "^0.27.3",
