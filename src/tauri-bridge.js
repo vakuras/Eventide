@@ -9,9 +9,12 @@
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
-const { open: shellOpen } = window.__TAURI__.shell;
-const { open: dialogOpen } = window.__TAURI__.dialog;
-const { readText: clipboardRead, writeText: clipboardWrite } = window.__TAURI__.clipboardManager;
+
+// Plugin APIs — accessed lazily to avoid startup errors if plugins load async
+const getShellOpen = () => window.__TAURI__?.shell?.open;
+const getDialogOpen = () => window.__TAURI__?.dialog?.open;
+const getClipboardRead = () => window.__TAURI__?.clipboardManager?.readText;
+const getClipboardWrite = () => window.__TAURI__?.clipboardManager?.writeText;
 
 // Zoom state managed in the frontend (Tauri webview doesn't have per-window zoom API)
 let currentZoom = 1.0;
@@ -30,7 +33,9 @@ window.api = {
   newSession: (cwd) => invoke('new_session', { cwd: cwd || null }),
   killSession: (sessionId) => invoke('kill_pty', { sessionId }),
   pickDirectory: async (defaultPath) => {
-    const result = await dialogOpen({
+    const openDialog = getDialogOpen();
+    if (!openDialog) return null;
+    const result = await openDialog({
       title: 'Choose working directory',
       defaultPath: defaultPath || undefined,
       directory: true,
@@ -82,7 +87,8 @@ window.api = {
   // ── Shell ─────────────────────────────────────────────────
   openExternal: (url) => {
     if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-      shellOpen(url);
+      const open = getShellOpen();
+      if (open) open(url);
     }
   },
 
@@ -106,8 +112,14 @@ window.api = {
   getZoom: async () => currentZoom,
 
   // ── Clipboard ─────────────────────────────────────────────
-  copyText: (text) => clipboardWrite(text),
-  pasteText: () => clipboardRead(),
+  copyText: (text) => {
+    const write = getClipboardWrite();
+    return write ? write(text) : Promise.resolve();
+  },
+  pasteText: () => {
+    const read = getClipboardRead();
+    return read ? read() : Promise.resolve('');
+  },
 
   // ── App info ──────────────────────────────────────────────
   getVersion: () => invoke('get_app_version'),

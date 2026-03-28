@@ -11,8 +11,9 @@
     "launch": "npm run build && wscript launch.vbs",
     "test": "vitest run",
     "dist": "npm run build && electron-builder --win",
-    "tauri:dev": "npm run build && npx tauri dev",
-    "tauri:build": "npm run build && npx tauri build"
+    "tauri:build-frontend": "node scripts/build-tauri-frontend.js",
+    "tauri:dev": "npm run tauri:build-frontend && npx tauri dev",
+    "tauri:build": "npm run tauri:build-frontend && npx tauri build"
   },
   "build": {
     "appId": "com.eventide.app",

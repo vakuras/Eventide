@@ -4,10 +4,10 @@
   "version": "0.9.0",
   "identifier": "com.eventide.app",
   "build": {
-    "frontendDist": "..",
+    "frontendDist": "../dist-tauri",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run build",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm run tauri:build-frontend",
+    "beforeBuildCommand": "npm run tauri:build-frontend"
   },
   "app": {
     "windows": [
