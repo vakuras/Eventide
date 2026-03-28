@@ -14,7 +14,7 @@ use commands::{
         open_session, new_session, write_pty, resize_pty, kill_pty,
         get_active_sessions, change_cwd,
     },
-    status::get_session_status,
+    status::{get_session_status, get_session_diffs},
     notifications::{
         get_notifications, get_unread_count, mark_notification_read,
         mark_all_notifications_read, dismiss_notification, clear_all_notifications,
@@ -62,6 +62,7 @@ pub fn run() {
             change_cwd,
             // Status
             get_session_status,
+            get_session_diffs,
             // Notifications
             get_notifications,
             get_unread_count,
