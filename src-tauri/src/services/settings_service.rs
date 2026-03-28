@@ -67,7 +67,7 @@ pub struct SettingsService {
 impl SettingsService {
     pub fn new(config_dir: &Path) -> Self {
         Self {
-            config_path: config_dir.join("session-gui-settings.json"),
+            config_path: config_dir.join("eventide-settings.json"),
             settings: Settings::default(),
         }
     }

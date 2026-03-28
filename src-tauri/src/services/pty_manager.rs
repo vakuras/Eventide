@@ -106,6 +106,19 @@ impl PtyManager {
         };
         cmd.cwd(spawn_cwd);
 
+        // Ensure proper environment — mirror the JS version's env setup
+        // portable-pty inherits env by default, but we explicitly set TERM
+        // and ensure critical Windows vars are present to prevent 0xC0000142
+        cmd.env("TERM", "xterm-256color");
+        if let Ok(val) = std::env::var("SystemRoot") { cmd.env("SystemRoot", val); }
+        if let Ok(val) = std::env::var("PATH") { cmd.env("PATH", val); }
+        if let Ok(val) = std::env::var("LOCALAPPDATA") { cmd.env("LOCALAPPDATA", val); }
+        if let Ok(val) = std::env::var("USERPROFILE") { cmd.env("USERPROFILE", val); }
+        if let Ok(val) = std::env::var("TEMP") { cmd.env("TEMP", val); }
+        if let Ok(val) = std::env::var("TMP") { cmd.env("TMP", val); }
+        if let Ok(val) = std::env::var("ComSpec") { cmd.env("ComSpec", val); }
+        if let Ok(val) = std::env::var("PROGRAMFILES") { cmd.env("PROGRAMFILES", val); }
+
         let child = pair
             .slave
             .spawn_command(cmd)

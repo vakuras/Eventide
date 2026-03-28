@@ -1,11 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/v2/tooling/cli/schema.json",
   "productName": "Eventide",
-  "version": "0.9.0",
+  "version": "0.1.0",
   "identifier": "com.eventide.app",
   "build": {
     "frontendDist": "../dist-tauri",
-    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run tauri:build-frontend",
     "beforeBuildCommand": "npm run tauri:build-frontend"
   },
@@ -40,6 +39,6 @@
         "installMode": "currentUser"
       }
     },
-    "publisher": "itsela-ms"
+    "publisher": "vakuras"
   }
 }

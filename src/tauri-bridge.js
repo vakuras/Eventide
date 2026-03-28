@@ -157,7 +157,22 @@ window.api = {
     }).then(fn => { unlisten = fn; });
     return () => { if (unlisten) unlisten(); };
   },
+
+  // ── Window controls ──────────────────────────────────────
+  minimizeWindow: () => window.__TAURI__.window.getCurrentWindow().minimize(),
+  maximizeWindow: () => window.__TAURI__.window.getCurrentWindow().toggleMaximize(),
+  closeWindow: () => window.__TAURI__.window.getCurrentWindow().close(),
 };
+
+// Wire window control buttons
+document.addEventListener('DOMContentLoaded', () => {
+  const btnMin = document.getElementById('btn-minimize');
+  const btnMax = document.getElementById('btn-maximize');
+  const btnClose = document.getElementById('btn-close');
+  if (btnMin) btnMin.addEventListener('click', () => window.api.minimizeWindow());
+  if (btnMax) btnMax.addEventListener('click', () => window.api.maximizeWindow());
+  if (btnClose) btnClose.addEventListener('click', () => window.api.closeWindow());
+});
 
 // Restore persisted zoom on load
 invoke('get_settings').then(settings => {

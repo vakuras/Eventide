@@ -70,7 +70,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  padding-right: 140px; /* space for Windows title bar overlay buttons */
+  padding-right: 0;
   -webkit-app-region: drag;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
@@ -84,6 +84,37 @@ body {
   transition: color 0.15s;
 }
 .titlebar-text:hover { color: var(--text); }
+
+.titlebar-window-controls {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}
+
+.window-control {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  width: 46px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.window-control:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.window-control-close:hover {
+  background: #e81123;
+  color: #fff;
+}
 
 .titlebar-actions {
   -webkit-app-region: no-drag;
@@ -1082,6 +1113,10 @@ body {
 .empty-icon {
   font-size: 48px;
   opacity: 0.3;
+}
+.empty-icon-img {
+  width: 120px;
+  opacity: 0.6;
 }
 
 #empty-state p {

@@ -34,6 +34,7 @@ const copies = [
   ['src/styles.css', 'styles.css'],
   ['src/tauri-bridge.js', 'tauri-bridge.js'],
   ['node_modules/@xterm/xterm/css/xterm.css', 'xterm.css'],
+  ['eventide.png', 'eventide.png'],
 ];
 
 for (const [src, dest] of copies) {

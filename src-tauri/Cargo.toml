@@ -1,8 +1,8 @@
 [package]
 name = "eventide"
-version = "0.9.0"
+version = "0.1.0"
 description = "Your command center for GitHub Copilot CLI"
-authors = ["itsela-ms"]
+authors = ["vakuras"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.77"
