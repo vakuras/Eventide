@@ -73,6 +73,14 @@ const XTERM_THEMES = {
     blue: '#1e66f5', magenta: '#ea76cb', cyan: '#179299', white: '#acb0be',
     brightBlack: '#6c6f85', brightRed: '#d20f39', brightGreen: '#40a02b', brightYellow: '#df8e1d',
     brightBlue: '#1e66f5', brightMagenta: '#ea76cb', brightCyan: '#179299', brightWhite: '#bcc0cc'
+  },
+  midnight: {
+    background: '#121212', foreground: '#e8eaed', cursor: '#e8eaed', cursorAccent: '#121212',
+    selectionBackground: '#3c4043', selectionForeground: '#e8eaed',
+    black: '#3c4043', red: '#f28b82', green: '#81c995', yellow: '#fdd663',
+    blue: '#8ab4f8', magenta: '#d7aefb', cyan: '#78d9ec', white: '#dadce0',
+    brightBlack: '#5f6368', brightRed: '#f28b82', brightGreen: '#81c995', brightYellow: '#fdd663',
+    brightBlue: '#8ab4f8', brightMagenta: '#d7aefb', brightCyan: '#78d9ec', brightWhite: '#e8eaed'
   }
 };
 
