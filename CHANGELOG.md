@@ -2,6 +2,12 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.2.1] - 2026-03-28
+
+### Fixed
+- **Hide pty_host console window** — pty_host.exe no longer opens a visible terminal window alongside Eventide (uses `CREATE_NO_WINDOW` flag on Windows)
+- Closing the stray console window no longer kills the Eventide session
+
 ## [0.2.0] - 2026-03-28
 
 ### Added

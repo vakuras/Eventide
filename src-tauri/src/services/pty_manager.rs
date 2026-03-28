@@ -86,12 +86,20 @@ impl PtyManager {
 
         eprintln!("[eventide] Spawning via pty_host: --resume {} (cwd: {})", session_id, spawn_cwd);
 
-        let mut child = Command::new(&pty_host)
-            .args([&self.copilot_path, session_id, spawn_cwd, "120", "40"])
+        #[cfg(target_os = "windows")]
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let mut cmd = Command::new(&pty_host);
+        cmd.args([&self.copilot_path, session_id, spawn_cwd, "120", "40"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stderr(Stdio::piped());
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let mut child = cmd.spawn()
             .map_err(|e| format!("Failed to spawn pty_host: {}", e))?;
 
         let stdin = child.stdin.take()
