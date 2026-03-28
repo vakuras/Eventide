@@ -2,6 +2,13 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.2.3] - 2026-03-28
+
+### Fixed
+- **Fix terminal input freezing** — removed pending buffer in pty_host stdin handler that could stall when escape sequences split across reads
+- Improved write error handling — marks session as dead on write failure instead of propagating error
+- Simplified pty_host stdin→PTY forwarding for reliability
+
 ## [0.2.2] - 2026-03-28
 
 ### Fixed

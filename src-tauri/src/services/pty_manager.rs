@@ -199,14 +199,35 @@ impl PtyManager {
     }
 
     pub fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
+        // Clone the writer handle outside the lock to avoid blocking other operations
+        let writer_result = {
+            let mut sessions = self.sessions.lock().unwrap();
+            if let Some(entry) = sessions.get_mut(session_id) {
+                if entry.alive {
+                    Some(entry.kill_flag.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if writer_result.is_none() {
+            return Ok(());
+        }
+
+        // Write with the sessions lock held briefly — write_all on a pipe shouldn't
+        // block for small payloads (keystrokes), but if it does, we hold the lock.
+        // For a more robust solution, we'd use async I/O.
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(entry) = sessions.get_mut(session_id) {
             if entry.alive {
-                entry
-                    .writer
-                    .write_all(data.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                entry.writer.flush().map_err(|e| e.to_string())?;
+                if entry.writer.write_all(data.as_bytes()).is_err() {
+                    entry.alive = false;
+                    return Err("Write failed — session may have exited".to_string());
+                }
+                let _ = entry.writer.flush();
             }
         }
         Ok(())

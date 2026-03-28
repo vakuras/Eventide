@@ -89,7 +89,6 @@ fn main() {
         let stdin = io::stdin();
         let mut stdin = stdin.lock();
         let mut buf = [0u8; 4096];
-        let mut pending = Vec::new();
 
         loop {
             match stdin.read(&mut buf) {
@@ -97,45 +96,41 @@ fn main() {
                 Ok(n) => {
                     let data = &buf[..n];
                     // Check for resize escape: \x1b]666;resize;<cols>;<rows>\x07
-                    pending.extend_from_slice(data);
-
-                    while !pending.is_empty() {
-                        if let Some(esc_pos) = pending.iter().position(|&b| b == 0x1b) {
-                            // Send everything before the escape
-                            if esc_pos > 0 {
-                                let _ = writer.write_all(&pending[..esc_pos]);
+                    if let Some(esc_start) = data.iter().position(|&b| b == 0x1b) {
+                        let rest = &data[esc_start..];
+                        if let Some(end) = rest.iter().position(|&b| b == 0x07) {
+                            // Send bytes before the escape
+                            if esc_start > 0 {
+                                let _ = writer.write_all(&data[..esc_start]);
                                 let _ = writer.flush();
                             }
-                            // Check if it's our resize sequence
-                            let rest = &pending[esc_pos..];
-                            if let Some(end) = rest.iter().position(|&b| b == 0x07) {
-                                let seq = String::from_utf8_lossy(&rest[..end]);
-                                if seq.starts_with("\x1b]666;resize;") {
-                                    let parts: Vec<&str> = seq.trim_start_matches("\x1b]666;resize;").split(';').collect();
-                                    if parts.len() == 2 {
-                                        if let (Ok(c), Ok(r)) = (parts[0].parse::<u16>(), parts[1].parse::<u16>()) {
-                                            let _ = master_for_resize.lock().unwrap().resize(PtySize {
-                                                rows: r, cols: c, pixel_width: 0, pixel_height: 0,
-                                            });
-                                        }
+                            // Parse resize
+                            let seq = String::from_utf8_lossy(&rest[..end]);
+                            if seq.starts_with("\x1b]666;resize;") {
+                                let parts: Vec<&str> = seq.trim_start_matches("\x1b]666;resize;").split(';').collect();
+                                if parts.len() == 2 {
+                                    if let (Ok(c), Ok(r)) = (parts[0].parse::<u16>(), parts[1].parse::<u16>()) {
+                                        let _ = master_for_resize.lock().unwrap().resize(PtySize {
+                                            rows: r, cols: c, pixel_width: 0, pixel_height: 0,
+                                        });
                                     }
                                 }
-                                pending = pending[esc_pos + end + 1..].to_vec();
-                            } else if rest.len() > 50 {
-                                // Not a resize sequence, send as-is
-                                let _ = writer.write_all(&pending);
+                            }
+                            // Send bytes after the escape sequence
+                            let after = esc_start + end + 1;
+                            if after < n {
+                                let _ = writer.write_all(&data[after..]);
                                 let _ = writer.flush();
-                                pending.clear();
-                            } else {
-                                // Might be incomplete escape, wait for more data
-                                break;
                             }
                         } else {
-                            // No escape, send all
-                            let _ = writer.write_all(&pending);
+                            // No terminator found — not our sequence, forward everything
+                            let _ = writer.write_all(data);
                             let _ = writer.flush();
-                            pending.clear();
                         }
+                    } else {
+                        // No escape, forward all
+                        let _ = writer.write_all(data);
+                        let _ = writer.flush();
                     }
                 }
                 Err(_) => break,
