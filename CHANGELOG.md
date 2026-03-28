@@ -2,6 +2,12 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.2.5] - 2026-03-28
+
+### Fixed
+- **History session click error handling** — clicking a history session now shows a toast error if it fails to open, instead of silently failing
+- Improved error visibility for session open failures
+
 ## [0.2.4] - 2026-03-28
 
 ### Fixed

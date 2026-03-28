@@ -1406,6 +1406,9 @@ async function openSession(sessionId) {
     saveTabState();
     // Wait for rAF focus to complete
     await new Promise(resolve => requestAnimationFrame(resolve));
+  } catch (err) {
+    console.error('[eventide] Failed to open session:', sessionId, err);
+    showToast('Failed to open session: ' + (err?.message || err), 'error');
   } finally {
     openingSession.delete(sessionId);
   }
