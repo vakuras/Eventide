@@ -2,6 +2,12 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.2.4] - 2026-03-28
+
+### Fixed
+- **Settings close button stays visible** — header is now sticky, × button no longer scrolls away
+- Close button hover turns red for clarity — no longer mistaken for directory clear button
+
 ## [0.2.3] - 2026-03-28
 
 ### Fixed

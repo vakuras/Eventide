@@ -1521,6 +1521,11 @@ body {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  z-index: 10;
+  border-radius: 12px 12px 0 0;
 }
 
 .settings-modal-header h2 {
@@ -1533,14 +1538,16 @@ body {
   background: none;
   border: none;
   color: var(--text-dim);
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 8px;
   line-height: 1;
+  border-radius: 6px;
 }
 
 .settings-close:hover {
-  color: var(--text);
+  color: var(--red);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .settings-body {
