@@ -2,6 +2,13 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.2.2] - 2026-03-28
+
+### Fixed
+- **Clean startup** — window starts hidden and shows only after frontend is fully loaded (no more black flash)
+- **Disable right-click context menu** — WebView2 default context menu no longer appears
+- Added `core:window:allow-show` capability for deferred window display
+
 ## [0.2.1] - 2026-03-28
 
 ### Fixed

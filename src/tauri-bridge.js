@@ -186,3 +186,16 @@ invoke('get_settings').then(settings => {
     document.body.style.zoom = currentZoom;
   }
 });
+
+// Show window after frontend is ready (starts hidden to avoid black flash)
+const showWindow = () => {
+  invoke('plugin:window|show', { label: 'main' }).catch(() => {});
+};
+if (document.readyState === 'complete') {
+  showWindow();
+} else {
+  window.addEventListener('load', showWindow);
+}
+
+// Disable default right-click context menu
+document.addEventListener('contextmenu', (e) => e.preventDefault());
