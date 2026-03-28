@@ -21,21 +21,33 @@ jobs:
           node-version: 20
           cache: npm
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - run: npm ci
 
-      - run: npm test
+      - name: Build frontend
+        run: npm run build
 
-      - run: npm run dist
+      - name: Run Rust tests
+        run: cargo test
+        working-directory: src-tauri
+
+      - name: Build Tauri app
+        run: npx tauri build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: dist-Windows
           path: |
-            release/*.exe
-            release/*.yml
-            release/*.blockmap
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/release/bundle/nsis/*.sig
           if-no-files-found: warn
 
   release:
