@@ -115,3 +115,75 @@ impl SettingsService {
         self.settings.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    #[test]
+    fn test_defaults() {
+        let dir = temp_dir();
+        let svc = SettingsService::new(dir.path());
+        let s = svc.get();
+        assert_eq!(s.max_concurrent, 5);
+        assert_eq!(s.theme, "mocha");
+        assert_eq!(s.zoom_factor, 1.0);
+        assert!(!s.sidebar_collapsed);
+        assert!(s.open_tabs.is_empty());
+    }
+
+    #[test]
+    fn test_save_and_load() {
+        let dir = temp_dir();
+        {
+            let mut svc = SettingsService::new(dir.path());
+            svc.update(serde_json::json!({ "theme": "latte", "maxConcurrent": 10 }));
+        }
+        {
+            let mut svc = SettingsService::new(dir.path());
+            svc.load();
+            let s = svc.get();
+            assert_eq!(s.theme, "latte");
+            assert_eq!(s.max_concurrent, 10);
+            // Defaults preserved for unset fields
+            assert_eq!(s.zoom_factor, 1.0);
+        }
+    }
+
+    #[test]
+    fn test_partial_update_preserves_other_fields() {
+        let dir = temp_dir();
+        let mut svc = SettingsService::new(dir.path());
+        svc.update(serde_json::json!({ "theme": "latte" }));
+        let s = svc.get();
+        assert_eq!(s.theme, "latte");
+        assert_eq!(s.max_concurrent, 5); // unchanged
+
+        svc.update(serde_json::json!({ "maxConcurrent": 3 }));
+        let s = svc.get();
+        assert_eq!(s.theme, "latte"); // still latte
+        assert_eq!(s.max_concurrent, 3);
+    }
+
+    #[test]
+    fn test_load_missing_file_uses_defaults() {
+        let dir = temp_dir();
+        let mut svc = SettingsService::new(dir.path());
+        svc.load();
+        assert_eq!(svc.get().theme, "mocha");
+    }
+
+    #[test]
+    fn test_load_corrupt_file_uses_defaults() {
+        let dir = temp_dir();
+        fs::write(dir.path().join("session-gui-settings.json"), "not json!").unwrap();
+        let mut svc = SettingsService::new(dir.path());
+        svc.load();
+        assert_eq!(svc.get().theme, "mocha");
+    }
+}

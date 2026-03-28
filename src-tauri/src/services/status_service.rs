@@ -487,3 +487,145 @@ fn summarize_next_step(text: &str) -> Option<String> {
 
     Some(shortened.join(" "))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    // --- summarize_next_step ---
+
+    #[test]
+    fn test_summarize_short_text() {
+        assert_eq!(summarize_next_step("Fix the bug"), Some("Fix the bug".to_string()));
+    }
+
+    #[test]
+    fn test_summarize_long_text_truncates() {
+        let long = "Implement the new authentication flow with JWT tokens and refresh logic";
+        let result = summarize_next_step(long).unwrap();
+        let words: Vec<_> = result.split_whitespace().collect();
+        assert!(words.len() <= MAX_NEXT_STEP_WORDS);
+    }
+
+    #[test]
+    fn test_summarize_strips_trailing_filler() {
+        // "Create tests for the" → should strip "the"
+        let result = summarize_next_step("Create tests for the authentication module in the app").unwrap();
+        assert!(!result.ends_with(" the"));
+        assert!(!result.ends_with(" in"));
+    }
+
+    #[test]
+    fn test_summarize_empty() {
+        assert_eq!(summarize_next_step(""), None);
+        assert_eq!(summarize_next_step("   "), None);
+    }
+
+    #[test]
+    fn test_summarize_strips_backticks() {
+        assert_eq!(summarize_next_step("`Fix` the `bug`"), Some("Fix the bug".to_string()));
+    }
+
+    // --- read_plan ---
+
+    #[test]
+    fn test_plan_with_checkboxes() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("sess1");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("plan.md"), "# Plan\n- [x] First step\n- [ ] Second step\n- [ ] Third step\n").unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let items = svc.read_plan(&session_dir);
+        assert_eq!(items.len(), 3);
+        assert!(items[0].done);
+        assert!(!items[0].current);
+        assert!(!items[1].done);
+        assert!(items[1].current); // first unchecked = current
+        assert!(!items[2].done);
+        assert!(!items[2].current);
+    }
+
+    #[test]
+    fn test_plan_all_done() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("sess2");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("plan.md"), "- [x] Done one\n- [x] Done two\n").unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let items = svc.read_plan(&session_dir);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|i| i.done));
+        assert!(items.iter().all(|i| !i.current));
+    }
+
+    #[test]
+    fn test_plan_missing_file() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("no-plan");
+        fs::create_dir_all(&session_dir).unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let items = svc.read_plan(&session_dir);
+        assert!(items.is_empty());
+    }
+
+    // --- read_summary ---
+
+    #[test]
+    fn test_summary_from_workspace_yaml() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("sess-yaml");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("workspace.yaml"), "summary: Migrating to Tauri\ncwd: C:\\dev").unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let summary = svc.read_summary(&session_dir);
+        assert!(summary.is_some());
+        let s = summary.unwrap();
+        assert_eq!(s.text, "Migrating to Tauri");
+        assert_eq!(s.source, "workspace");
+    }
+
+    #[test]
+    fn test_summary_from_session_summary_md() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("sess-md");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("session-summary.md"), "# Session\n## Summary\nPorting to Rust.\n## Details\nMore info.").unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let summary = svc.read_summary(&session_dir);
+        assert!(summary.is_some());
+        let s = summary.unwrap();
+        assert_eq!(s.text, "Porting to Rust.");
+        assert_eq!(s.source, "session-summary");
+    }
+
+    // --- read_files ---
+
+    #[test]
+    fn test_read_files_from_events() {
+        let dir = temp_dir();
+        let session_dir = dir.path().join("sess-files");
+        fs::create_dir_all(&session_dir).unwrap();
+        let events = concat!(
+            r#"{"type":"tool.execution_start","data":{"toolName":"edit","arguments":{"path":"C:\\dev\\src\\main.rs"}}}"#,
+            "\n",
+            r#"{"type":"tool.execution_start","data":{"toolName":"create","arguments":{"path":"C:\\dev\\src\\new.rs"}}}"#,
+        );
+        fs::write(session_dir.join("events.jsonl"), events).unwrap();
+
+        let svc = StatusService::new(dir.path());
+        let files = svc.read_files(&session_dir);
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.path.contains("main.rs") && f.action == "M"));
+        assert!(files.iter().any(|f| f.path.contains("new.rs") && f.action == "A"));
+    }
+}

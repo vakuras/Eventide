@@ -518,3 +518,227 @@ fn build_search_match(text: &str, match_index: usize, match_length: usize, sourc
         source_label: source_label.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_session_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    fn create_session(dir: &Path, id: &str, yaml: &str, events: Option<&str>) {
+        let session_dir = dir.join(id);
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("workspace.yaml"), yaml).unwrap();
+        if let Some(events_content) = events {
+            fs::write(session_dir.join("events.jsonl"), events_content).unwrap();
+        }
+    }
+
+    // --- Title cleaning ---
+
+    #[test]
+    fn test_clean_auto_title_short() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        assert_eq!(svc.clean_auto_title("Fix the bug"), "Fix the bug");
+    }
+
+    #[test]
+    fn test_clean_auto_title_truncates_long() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        let long = "a".repeat(80);
+        let result = svc.clean_auto_title(&long);
+        assert!(result.len() <= 70);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_clean_auto_title_strips_quotes() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        assert_eq!(svc.clean_auto_title("\"some prompt\""), "some prompt");
+    }
+
+    #[test]
+    fn test_clean_auto_title_knowledge_answer() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        let result = svc.clean_auto_title("\"Use the 'knowledge-based-answer' answer: what is Tauri?\"");
+        assert_eq!(result, "what is Tauri?");
+    }
+
+    // --- CWD resolution ---
+
+    #[test]
+    fn test_cwd_eventide_file_takes_priority() {
+        let dir = temp_session_dir();
+        let session_dir = dir.path().join("sess1");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join(".eventide-cwd"), "C:\\eventide").unwrap();
+        fs::write(session_dir.join(".deepsky-cwd"), "C:\\deepsky").unwrap();
+
+        let svc = SessionService::new(dir.path());
+        let meta = WorkspaceMeta::default();
+        assert_eq!(svc.resolve_cwd(&session_dir, &meta), "C:\\eventide");
+    }
+
+    #[test]
+    fn test_cwd_deepsky_fallback() {
+        let dir = temp_session_dir();
+        let session_dir = dir.path().join("sess1");
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join(".deepsky-cwd"), "C:\\deepsky").unwrap();
+
+        let svc = SessionService::new(dir.path());
+        let meta = WorkspaceMeta::default();
+        assert_eq!(svc.resolve_cwd(&session_dir, &meta), "C:\\deepsky");
+    }
+
+    #[test]
+    fn test_cwd_workspace_yaml_fallback() {
+        let dir = temp_session_dir();
+        let session_dir = dir.path().join("sess1");
+        fs::create_dir_all(&session_dir).unwrap();
+
+        let svc = SessionService::new(dir.path());
+        let meta = WorkspaceMeta { cwd: Some("C:\\yaml".to_string()), ..Default::default() };
+        assert_eq!(svc.resolve_cwd(&session_dir, &meta), "C:\\yaml");
+    }
+
+    // --- List sessions ---
+
+    #[test]
+    fn test_list_sessions_with_summary() {
+        let dir = temp_session_dir();
+        create_session(dir.path(), "abc-123", "summary: Fix auth bug\ncwd: C:\\dev", None);
+
+        let svc = SessionService::new(dir.path());
+        let sessions = svc.list_sessions().unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title, "Fix auth bug");
+        assert_eq!(sessions[0].cwd, "C:\\dev");
+    }
+
+    #[test]
+    fn test_list_sessions_title_from_events() {
+        let dir = temp_session_dir();
+        let events = r#"{"type":"user.message","data":{"content":"deploy the service to prod"}}"#;
+        create_session(dir.path(), "def-456", "cwd: C:\\dev", Some(events));
+
+        let svc = SessionService::new(dir.path());
+        let sessions = svc.list_sessions().unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title, "deploy the service to prod");
+    }
+
+    #[test]
+    fn test_list_sessions_custom_title() {
+        let dir = temp_session_dir();
+        create_session(dir.path(), "ghi-789", "summary: auto title", None);
+        fs::write(dir.path().join("ghi-789").join(".eventide-title"), "My Custom Title").unwrap();
+
+        let svc = SessionService::new(dir.path());
+        let sessions = svc.list_sessions().unwrap();
+        assert_eq!(sessions[0].title, "My Custom Title");
+    }
+
+    // --- Search ---
+
+    #[test]
+    fn test_search_finds_user_message() {
+        let dir = temp_session_dir();
+        let events = r#"{"type":"user.message","data":{"content":"fix the authentication bug in login"}}"#;
+        create_session(dir.path(), "search-1", "summary: test", Some(events));
+
+        let svc = SessionService::new(dir.path());
+        let results = svc.search_sessions("authentication").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "search-1");
+        assert!(!results[0].occurrences.is_empty());
+        assert!(results[0].occurrences[0].match_text.contains("authentication"));
+    }
+
+    #[test]
+    fn test_search_no_results() {
+        let dir = temp_session_dir();
+        let events = r#"{"type":"user.message","data":{"content":"hello world"}}"#;
+        create_session(dir.path(), "search-2", "summary: test", Some(events));
+
+        let svc = SessionService::new(dir.path());
+        let results = svc.search_sessions("nonexistent").unwrap();
+        assert!(results.is_empty());
+    }
+
+    // --- Helper functions ---
+
+    #[test]
+    fn test_normalize_text() {
+        assert_eq!(normalize_text("  hello   world  "), "hello world");
+        assert_eq!(normalize_text("single"), "single");
+        assert_eq!(normalize_text(""), "");
+    }
+
+    #[test]
+    fn test_collect_matches_basic() {
+        let matches = collect_matches_from_text("hello world hello", "hello", "User", 10);
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].match_text, "hello");
+        assert_eq!(matches[1].match_text, "hello");
+    }
+
+    #[test]
+    fn test_collect_matches_case_insensitive() {
+        let matches = collect_matches_from_text("Hello HELLO hello", "hello", "User", 10);
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn test_collect_matches_respects_limit() {
+        let matches = collect_matches_from_text("aaa aaa aaa aaa", "aaa", "User", 2);
+        assert_eq!(matches.len(), 2);
+    }
+
+    // --- Rename & Delete ---
+
+    #[test]
+    fn test_rename_creates_eventide_title() {
+        let dir = temp_session_dir();
+        let session_dir = dir.path().join("rename-1");
+        fs::create_dir_all(&session_dir).unwrap();
+
+        let svc = SessionService::new(dir.path());
+        svc.rename_session("rename-1", "New Title").unwrap();
+
+        let content = fs::read_to_string(session_dir.join(".eventide-title")).unwrap();
+        assert_eq!(content, "New Title");
+    }
+
+    #[test]
+    fn test_delete_removes_directory() {
+        let dir = temp_session_dir();
+        create_session(dir.path(), "delete-1", "summary: test", None);
+        assert!(dir.path().join("delete-1").exists());
+
+        let svc = SessionService::new(dir.path());
+        svc.delete_session("delete-1").unwrap();
+        assert!(!dir.path().join("delete-1").exists());
+    }
+
+    // --- Clean empty sessions ---
+
+    #[test]
+    fn test_clean_removes_empty_sessions() {
+        let dir = temp_session_dir();
+        create_session(dir.path(), "empty-1", "cwd: C:\\dev", None);
+        create_session(dir.path(), "has-summary", "summary: important work", None);
+        let events = r#"{"type":"user.message","data":{"content":"hello"}}"#;
+        create_session(dir.path(), "has-events", "cwd: C:\\dev", Some(events));
+
+        let svc = SessionService::new(dir.path());
+        let cleaned = svc.clean_empty_sessions().unwrap();
+        assert_eq!(cleaned, 1);
+        assert!(!dir.path().join("empty-1").exists());
+        assert!(dir.path().join("has-summary").exists());
+        assert!(dir.path().join("has-events").exists());
+    }
+}

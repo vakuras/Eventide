@@ -201,3 +201,107 @@ impl NotificationService {
         self.save_state();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    #[test]
+    fn test_push_and_get() {
+        let dir = temp_dir();
+        let mut svc = NotificationService::new(dir.path());
+        svc.push("task-done", "Build passed", "exit 0", Some("sess-1"));
+
+        let all = svc.get_all();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].title, "Build passed");
+        assert_eq!(all[0].notification_type, "task-done");
+        assert_eq!(all[0].session_id, Some("sess-1".to_string()));
+        assert!(!all[0].read);
+    }
+
+    #[test]
+    fn test_unread_count() {
+        let dir = temp_dir();
+        let mut svc = NotificationService::new(dir.path());
+        svc.push("info", "One", "", None);
+        svc.push("info", "Two", "", None);
+        assert_eq!(svc.get_unread_count(), 2);
+
+        svc.mark_read(1);
+        assert_eq!(svc.get_unread_count(), 1);
+    }
+
+    #[test]
+    fn test_mark_all_read() {
+        let dir = temp_dir();
+        let mut svc = NotificationService::new(dir.path());
+        svc.push("info", "One", "", None);
+        svc.push("info", "Two", "", None);
+        svc.mark_all_read();
+        assert_eq!(svc.get_unread_count(), 0);
+    }
+
+    #[test]
+    fn test_dismiss() {
+        let dir = temp_dir();
+        let mut svc = NotificationService::new(dir.path());
+        svc.push("info", "One", "", None);
+        svc.push("info", "Two", "", None);
+        svc.dismiss(1);
+        assert_eq!(svc.get_all().len(), 1);
+        assert_eq!(svc.get_all()[0].title, "Two");
+    }
+
+    #[test]
+    fn test_clear_all() {
+        let dir = temp_dir();
+        let mut svc = NotificationService::new(dir.path());
+        svc.push("info", "One", "", None);
+        svc.push("info", "Two", "", None);
+        svc.clear_all();
+        assert!(svc.get_all().is_empty());
+    }
+
+    #[test]
+    fn test_state_persistence() {
+        let dir = temp_dir();
+        {
+            let mut svc = NotificationService::new(dir.path());
+            svc.push("error", "Session crashed", "exit 1", Some("s1"));
+            svc.mark_read(1);
+        }
+        {
+            let svc = NotificationService::new(dir.path());
+            let all = svc.get_all();
+            assert_eq!(all.len(), 1);
+            assert_eq!(all[0].title, "Session crashed");
+            assert!(all[0].read);
+        }
+    }
+
+    #[test]
+    fn test_consumes_json_files() {
+        let dir = temp_dir();
+        let notif_json = serde_json::json!({
+            "type": "task-done",
+            "title": "Build complete",
+            "body": "All tests passed",
+            "sessionId": "abc-123"
+        });
+        fs::write(dir.path().join("notif-001.json"), notif_json.to_string()).unwrap();
+
+        let svc = NotificationService::new(dir.path());
+        let all = svc.get_all();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].title, "Build complete");
+
+        // File should be consumed (deleted)
+        assert!(!dir.path().join("notif-001.json").exists());
+    }
+}
