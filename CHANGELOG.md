@@ -20,7 +20,7 @@ All notable changes to Eventide are documented here.
 - Removed unused `kill_all` method from PtyManager
 - Suppressed `dead_code` warnings on utility functions (`is_cmd_shim`, `push`)
 
-## [0.1.0] - 2025-07-13
+## [0.1.0] - 2026-03-28
 
 ### Added
 - **Tauri v2 migration** — rebuilt from Electron to Tauri with Rust backend
