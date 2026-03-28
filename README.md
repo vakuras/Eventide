@@ -1,18 +1,18 @@
-# DeepSky ✦
+# Eventide ✦
 
 **Your command center for GitHub Copilot CLI.**
 
-Stop juggling session IDs. DeepSky gives you a sleek desktop app to manage, search, and switch between all your Copilot CLI sessions — so you can focus on building, not bookkeeping.
+Stop juggling session IDs. Eventide gives you a sleek desktop app to manage, search, and switch between all your Copilot CLI sessions — so you can focus on building, not bookkeeping.
 
 ![Windows](https://img.shields.io/badge/platform-Windows-blue)
-![macOS](https://img.shields.io/badge/platform-macOS-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Tauri](https://img.shields.io/badge/built%20with-Tauri%20v2-blue)
 
 ---
 
-## Why DeepSky?
+## Why Eventide?
 
-Copilot CLI is powerful, but managing sessions is painful. You're copying UUIDs, grepping through directories, and losing track of what's running. DeepSky fixes all of that with a visual interface purpose-built for power users.
+Copilot CLI is powerful, but managing sessions is painful. You're copying UUIDs, grepping through directories, and losing track of what's running. Eventide fixes all of that with a visual interface purpose-built for power users.
 
 ## ✨ Features
 
@@ -25,59 +25,62 @@ Copilot CLI is powerful, but managing sessions is painful. You're copying UUIDs,
 ### Embedded Terminal
 - Full-featured terminal with 10,000-line scrollback, link detection, and clipboard support
 - Multi-tab interface — switch between sessions like browser tabs
-- Seamless session switching without losing state
+- ConPTY-backed terminal with full ANSI support, resize, and colors
 
 ### Smart Search & Resources
 - Find sessions by title, tags, PR numbers, work item IDs, or repo names
-- **Resource panel** — every session shows its linked PRs, work items, repos, and wiki pages as clickable links
+- Every session shows its linked PRs, work items, repos, and wiki pages as clickable links
+- Auto-extracted tags: repo names, tools, topics
+
+### Session Status
+- Live Copilot intent indicator
+- Session summary, next steps, and timeline
+- Files changed with added/modified badges
 
 ### Notifications
 - Real-time alerts when tasks complete, sessions error out, or input is needed
-- Badge counter, dropdown panel, toast popups, and native OS notifications
-- Never miss a completed build or a session waiting for input again
-
-### Custom Instructions
-- Built-in viewer for your `copilot-instructions.md` with Markdown rendering, collapsible sections, and table of contents
-- Import/export and merge instructions across projects
+- Badge counter, dropdown panel, and toast popups
 
 ### Polish
-- **Catppuccin themes** — Mocha (dark) and Latte (light), because aesthetics matter
-- **Auto-updates** — new versions download and install in the background
+- **Three themes** — Mocha (dark), Latte (light), Midnight (true dark)
+- Custom window controls with native Windows icons
+- Separate settings from other tools (`eventide-settings.json`)
+
+---
+
+## Architecture
+
+Eventide is built with **Tauri v2** (Rust backend + WebView2 frontend):
+
+- **Backend**: 7 Rust services — Settings, Sessions, PTY, Tags, Resources, Status, Notifications
+- **Frontend**: Vanilla JS with xterm.js terminal emulator
+- **PTY Host**: Console-mode helper binary for ConPTY bridging (required because Tauri GUI apps can't create ConPTY children directly)
 
 ---
 
 ## Installation
 
-### Windows Installer (recommended)
-
-1. Download the latest `DeepSky Setup x.x.x.exe` from [**Releases**](https://github.com/itsela-ms/DeepSky/releases)
-2. Run the installer — installs to your user profile with a Start Menu entry
-3. Launch DeepSky from the Start Menu
-
-> **Prerequisite:** [GitHub Copilot CLI](https://github.com/github/copilot-cli) — `winget install github.copilot`
-
-### macOS Installer
-
-1. Download the latest `DeepSky-x.x.x.dmg` from [**Releases**](https://github.com/itsela-ms/DeepSky/releases)
-2. Open the DMG and drag DeepSky to Applications
-3. Launch DeepSky from Applications or Spotlight
-
-> **Prerequisite:** [GitHub Copilot CLI](https://github.com/github/copilot-cli) — `brew install github/gh/copilot`
-
 ### From Source
 
 ```bash
-git clone https://github.com/itsela-ms/DeepSky.git
-cd DeepSky
+git clone https://github.com/vakuras/Eventide.git
+cd Eventide
 npm install
-npm start
+npm run dev
 ```
 
----
+**Prerequisites:**
+- [GitHub Copilot CLI](https://github.com/github/copilot-cli) — `winget install github.copilot`
+- [Rust](https://rustup.rs/) (1.77+)
+- [Node.js](https://nodejs.org/) (18+)
 
-## Updates
+### Build for Distribution
 
-DeepSky checks for updates automatically every 15 minutes. When a new version is found, it downloads silently and installs on your next quit — no restarts, no interruptions. A green badge on the settings gear lets you know an update is pending.
+```bash
+npm run tauri:build
+```
+
+Output: `src-tauri/target/release/bundle/nsis/`
 
 ---
 
