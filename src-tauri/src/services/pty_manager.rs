@@ -85,42 +85,33 @@ impl PtyManager {
         let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".to_string());
         let spawn_cwd = cwd.unwrap_or(&home);
 
-        let pty_system = native_pty_system();
-        let pair = pty_system
-            .openpty(PtySize {
-                rows: 40,
-                cols: 120,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| format!("Failed to open PTY: {}", e))?;
+        eprintln!("[eventide] Spawning: {} --resume {} --yolo (cwd: {})", self.copilot_path, session_id, spawn_cwd);
 
-        // Spawn copilot directly (ConPTY handles it fine)
-        let mut cmd = CommandBuilder::new(&self.copilot_path);
-        cmd.args(["--resume", session_id, "--yolo"]);
-        cmd.cwd(spawn_cwd);
-        eprintln!("[eventide] Spawning PTY: {} --resume {} --yolo (cwd: {})", self.copilot_path, session_id, spawn_cwd);
+        // Use std::process::Command with CREATE_NEW_PROCESS_GROUP to avoid
+        // inheriting Tauri/WebView2's handle table (which breaks ConPTY children).
+        // We spawn via conhost.exe to get a proper console for the child.
+        use std::process::{Command, Stdio};
+        use std::os::windows::process::CommandExt;
 
-        // Only add TERM — let portable-pty inherit the full process environment
-        cmd.env("TERM", "xterm-256color");
+        const CREATE_NEW_CONSOLE: u32 = 0x00000010;
 
-        let child = pair
-            .slave
-            .spawn_command(cmd)
+        let mut child = Command::new(&self.copilot_path)
+            .args(["--resume", session_id, "--yolo"])
+            .current_dir(spawn_cwd)
+            .env("TERM", "xterm-256color")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(CREATE_NEW_CONSOLE)
+            .spawn()
             .map_err(|e| format!("Failed to spawn copilot: {}", e))?;
 
-        // Drop slave — we only need the master side
-        drop(pair.slave);
-
-        let mut reader = pair
-            .master
-            .try_clone_reader()
-            .map_err(|e| format!("Failed to clone PTY reader: {}", e))?;
-
-        let writer = pair
-            .master
-            .take_writer()
-            .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
+        let stdin = child.stdin.take()
+            .ok_or("Failed to get stdin")?;
+        let stdout = child.stdout.take()
+            .ok_or("Failed to get stdout")?;
+        let stderr = child.stderr.take()
+            .ok_or("Failed to get stderr")?;
 
         let kill_flag = Arc::new(Mutex::new(false));
         let kill_flag_clone = kill_flag.clone();
@@ -128,21 +119,50 @@ impl PtyManager {
         let session_id_owned = session_id.to_string();
         let app_handle = self.app_handle.clone();
 
-        // Data reader thread — reads from PTY and emits to frontend
+        // Stdout reader thread
         let sid_for_reader = session_id_owned.clone();
         let kill_for_reader = kill_flag.clone();
+        let app_for_stdout = app_handle.clone();
         thread::spawn(move || {
+            use std::io::Read;
+            let mut reader = stdout;
             let mut buf = [0u8; 4096];
             loop {
                 if *kill_for_reader.lock().unwrap() {
                     break;
                 }
                 match reader.read(&mut buf) {
-                    Ok(0) => break, // EOF
+                    Ok(0) => break,
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let _ = app_handle.emit("pty:data", serde_json::json!({
+                        let _ = app_for_stdout.emit("pty:data", serde_json::json!({
                             "sessionId": sid_for_reader,
+                            "data": data,
+                        }));
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        // Stderr reader thread — merge into same data stream
+        let sid_for_stderr = session_id_owned.clone();
+        let kill_for_stderr = kill_flag.clone();
+        let app_for_stderr = app_handle.clone();
+        thread::spawn(move || {
+            use std::io::Read;
+            let mut reader = stderr;
+            let mut buf = [0u8; 4096];
+            loop {
+                if *kill_for_stderr.lock().unwrap() {
+                    break;
+                }
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                        let _ = app_for_stderr.emit("pty:data", serde_json::json!({
+                            "sessionId": sid_for_stderr,
                             "data": data,
                         }));
                     }
@@ -155,13 +175,13 @@ impl PtyManager {
         let sid_for_exit = session_id_owned.clone();
         let app_handle_exit = self.app_handle.clone();
         thread::spawn(move || {
-            let mut child = child;
             let status = child.wait();
             let exit_code = status
-                .map(|s| s.exit_code() as i32)
+                .map(|s| s.code().unwrap_or(-1))
                 .unwrap_or(-1);
 
-            // Signal kill so reader thread stops
+            eprintln!("[eventide] Process exited: session={} code={}", sid_for_exit, exit_code);
+
             *kill_flag_clone.lock().unwrap() = true;
 
             let _ = app_handle_exit.emit("pty:exit", serde_json::json!({
@@ -171,7 +191,7 @@ impl PtyManager {
         });
 
         let entry = PtySession {
-            writer,
+            writer: Box::new(stdin),
             kill_flag: kill_flag.clone(),
             alive: true,
             opened_at: Instant::now(),
