@@ -2,11 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/v2/tooling/cli/schema.json",
   "productName": "Eventide",
   "version": "0.1.0",
-  "identifier": "com.eventide.app",
+  "identifier": "com.eventide.desktop",
   "build": {
     "frontendDist": "../dist-tauri",
-    "beforeDevCommand": "npm run tauri:build-frontend",
-    "beforeBuildCommand": "npm run tauri:build-frontend"
+    "beforeDevCommand": "npm run build",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
