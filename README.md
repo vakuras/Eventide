@@ -1,4 +1,4 @@
-# Eventide ✦
+# Eventide 🌒
 
 **Your command center for GitHub Copilot CLI.**
 

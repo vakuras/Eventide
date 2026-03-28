@@ -82,10 +82,10 @@ impl SessionService {
         let yaml_content = fs::read_to_string(&yaml_path).ok()?;
         let meta: WorkspaceMeta = serde_yaml::from_str(&yaml_content).unwrap_or_default();
 
-        // Title resolution: .eventide-title > .deepsky-title (backward compat) > summary > events > fallback
+        // Title resolution: .eventide-title > summary > events > fallback
         let (title, is_custom) = self.resolve_title(session_id, &session_dir, &meta);
 
-        // CWD resolution: .eventide-cwd > .deepsky-cwd (backward compat) > workspace.yaml cwd
+        // CWD resolution: .eventide-cwd > workspace.yaml cwd
         let cwd = self.resolve_cwd(&session_dir, &meta);
 
         // Timestamps
@@ -130,13 +130,11 @@ impl SessionService {
         session_dir: &Path,
         meta: &WorkspaceMeta,
     ) -> (String, bool) {
-        // 1. Custom title (.eventide-title, backward compat .deepsky-title)
-        for filename in &[".eventide-title", ".deepsky-title"] {
-            if let Ok(content) = fs::read_to_string(session_dir.join(filename)) {
-                let trimmed = content.trim().to_string();
-                if !trimmed.is_empty() {
-                    return (trimmed, true);
-                }
+        // 1. Custom title (.eventide-title)
+        if let Ok(content) = fs::read_to_string(session_dir.join(".eventide-title")) {
+            let trimmed = content.trim().to_string();
+            if !trimmed.is_empty() {
+                return (trimmed, true);
             }
         }
 
@@ -189,13 +187,11 @@ impl SessionService {
     }
 
     fn resolve_cwd(&self, session_dir: &Path, meta: &WorkspaceMeta) -> String {
-        // 1. .eventide-cwd / .deepsky-cwd (backward compat)
-        for filename in &[".eventide-cwd", ".deepsky-cwd"] {
-            if let Ok(content) = fs::read_to_string(session_dir.join(filename)) {
-                let trimmed = content.trim().to_string();
-                if !trimmed.is_empty() {
-                    return trimmed;
-                }
+        // 1. .eventide-cwd
+        if let Ok(content) = fs::read_to_string(session_dir.join(".eventide-cwd")) {
+            let trimmed = content.trim().to_string();
+            if !trimmed.is_empty() {
+                return trimmed;
             }
         }
         // 2. workspace.yaml cwd
@@ -575,23 +571,10 @@ mod tests {
         let session_dir = dir.path().join("sess1");
         fs::create_dir_all(&session_dir).unwrap();
         fs::write(session_dir.join(".eventide-cwd"), "C:\\eventide").unwrap();
-        fs::write(session_dir.join(".deepsky-cwd"), "C:\\deepsky").unwrap();
 
         let svc = SessionService::new(dir.path());
         let meta = WorkspaceMeta::default();
         assert_eq!(svc.resolve_cwd(&session_dir, &meta), "C:\\eventide");
-    }
-
-    #[test]
-    fn test_cwd_deepsky_fallback() {
-        let dir = temp_session_dir();
-        let session_dir = dir.path().join("sess1");
-        fs::create_dir_all(&session_dir).unwrap();
-        fs::write(session_dir.join(".deepsky-cwd"), "C:\\deepsky").unwrap();
-
-        let svc = SessionService::new(dir.path());
-        let meta = WorkspaceMeta::default();
-        assert_eq!(svc.resolve_cwd(&session_dir, &meta), "C:\\deepsky");
     }
 
     #[test]
