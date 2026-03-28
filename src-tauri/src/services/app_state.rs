@@ -52,8 +52,11 @@ impl AppState {
         let copilot_path = {
             let custom = settings_svc.get().copilot_path.clone();
             if custom.is_empty() {
-                copilot::resolve_copilot_path()
+                let resolved = copilot::resolve_copilot_path();
+                eprintln!("[eventide] Copilot path resolved: {}", resolved);
+                resolved
             } else {
+                eprintln!("[eventide] Copilot path (custom): {}", custom);
                 custom
             }
         };

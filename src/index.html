@@ -13,15 +13,14 @@
   <div id="titlebar">
     <span class="titlebar-text" id="titlebar-home" title="Home">Eventide</span>
     <div class="titlebar-actions">
-      <button id="btn-feedback" title="Feedback">✎</button>
       <button id="btn-notifications" title="Alerts">⚐<span id="notification-badge" class="notification-badge hidden">0</span></button>
       <button id="btn-instructions" title="Instructions">☰</button>
       <button id="btn-settings" title="Settings">⚙</button>
     </div>
     <div class="titlebar-window-controls">
-      <button id="btn-minimize" class="window-control" title="Minimize">─</button>
-      <button id="btn-maximize" class="window-control" title="Maximize">□</button>
-      <button id="btn-close" class="window-control window-control-close" title="Close">✕</button>
+      <button id="btn-minimize" class="window-control" title="Minimize">&#xE921;</button>
+      <button id="btn-maximize" class="window-control" title="Maximize">&#xE922;</button>
+      <button id="btn-close" class="window-control window-control-close" title="Close">&#xE8BB;</button>
     </div>
   </div>
 
@@ -77,7 +76,6 @@
                 <div id="empty-state">
                   <img src="eventide.png" alt="Eventide" class="empty-icon-img">
                   <p>No sessions yet. Start a new one to get going.</p>
-                  <button id="btn-new-center" title="New Session (Ctrl+N)">+ New Session</button>
                 </div>
               </div>
               <div id="terminal-prompt-ghost" class="terminal-prompt-ghost" aria-hidden="true"></div>
@@ -207,29 +205,6 @@
     </div>
   </div>
 
-  <!-- Feedback dropdown -->
-  <div id="feedback-panel" class="feedback-panel hidden">
-    <div class="feedback-panel-header">
-      <span>Feedback</span>
-      <button id="btn-close-feedback" class="notification-panel-actions btn-icon">×</button>
-    </div>
-    <div class="feedback-panel-body">
-      <button id="btn-report-bug" class="feedback-action">
-        <span class="feedback-action-icon">🐛</span>
-        <div class="feedback-action-text">
-          <div class="feedback-action-title">Report a Bug</div>
-          <div class="feedback-action-desc">Something isn't working as expected</div>
-        </div>
-      </button>
-      <button id="btn-request-feature" class="feedback-action">
-        <span class="feedback-action-icon">💡</span>
-        <div class="feedback-action-text">
-          <div class="feedback-action-title">Request a Feature</div>
-          <div class="feedback-action-desc">Suggest an idea or improvement</div>
-        </div>
-      </button>
-    </div>
-  </div>
 
   <!-- Notification dropdown -->
   <div id="notification-panel" class="notification-panel hidden">

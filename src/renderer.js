@@ -122,7 +122,7 @@ const btnToggleStatus = document.getElementById('btn-toggle-status');
 const notificationBadge = document.getElementById('notification-badge');
 const notificationPanel = document.getElementById('notification-panel');
 const notificationListEl = document.getElementById('notification-list');
-const feedbackPanel = document.getElementById('feedback-panel');
+const feedbackPanel = null; // removed
 const toastContainer = document.getElementById('toast-container');
 
 const titlebar = document.getElementById('titlebar');
@@ -734,23 +734,14 @@ async function init() {
   });
 
   document.addEventListener('click', (e) => {
-    if (!notificationPanel.classList.contains('hidden') && 
+    if (!notificationPanel.classList.contains('hidden') &&
         !notificationPanel.contains(e.target) && 
         !e.target.closest('#btn-notifications')) {
       notificationPanel.classList.add('hidden');
     }
-    if (!feedbackPanel.classList.contains('hidden') &&
-        !feedbackPanel.contains(e.target) &&
-        !e.target.closest('#btn-feedback')) {
-      feedbackPanel.classList.add('hidden');
-    }
   });
 
-  // Feedback
-  document.getElementById('btn-feedback').addEventListener('click', toggleFeedbackPanel);
-  document.getElementById('btn-close-feedback').addEventListener('click', () => feedbackPanel.classList.add('hidden'));
-  document.getElementById('btn-report-bug').addEventListener('click', () => openFeedbackIssue('bug'));
-  document.getElementById('btn-request-feature').addEventListener('click', () => openFeedbackIssue('feature'));
+  // Feedback — removed
 
   ipcCleanups.push(window.api.onNotification((notification) => {
     showToast(notification);
@@ -2734,7 +2725,7 @@ sessionSearchPrev.addEventListener('click', () => stepSessionSearch(-1));
 sessionSearchNext.addEventListener('click', () => stepSessionSearch(1));
 sessionSearchClose.addEventListener('click', () => closeSessionSearch());
 btnNew.addEventListener('click', newSession);
-btnNewCenter.addEventListener('click', newSession);
+if (btnNewCenter) btnNewCenter.addEventListener('click', newSession);
 
 maxConcurrentInput.addEventListener('change', (e) => {
   const val = parseInt(e.target.value, 10);
@@ -2763,7 +2754,6 @@ btnClearDefaultWorkdir.addEventListener('click', () => {
 async function toggleNotificationPanel() {
   const wasHidden = notificationPanel.classList.contains('hidden');
   notificationPanel.classList.toggle('hidden');
-  feedbackPanel.classList.add('hidden');
   if (wasHidden) {
     await window.api.markAllNotificationsRead();
     await refreshNotifications();
@@ -2771,35 +2761,11 @@ async function toggleNotificationPanel() {
 }
 
 function toggleFeedbackPanel() {
-  notificationPanel.classList.add('hidden');
-  feedbackPanel.classList.toggle('hidden');
+  // removed
 }
 
 async function openFeedbackIssue(type) {
-  feedbackPanel.classList.add('hidden');
-  const version = await window.api.getVersion();
-  const repoBase = 'https://github.com/itsela-ms/DeepSky/issues/new';
-
-  if (type === 'bug') {
-    const title = encodeURIComponent('[Bug] ');
-    const body = encodeURIComponent(
-      `**DeepSky Version:** v${version}\n\n` +
-      `**Describe the bug:**\n<!-- A clear description of what the bug is. -->\n\n` +
-      `**Steps to reproduce:**\n1. \n2. \n3. \n\n` +
-      `**Expected behavior:**\n\n` +
-      `**Actual behavior:**\n`
-    );
-    window.api.openExternal(`${repoBase}?labels=bug&title=${title}&body=${body}`);
-  } else {
-    const title = encodeURIComponent('[Feature] ');
-    const body = encodeURIComponent(
-      `**DeepSky Version:** v${version}\n\n` +
-      `**Feature Request:**\n<!-- A clear description of the feature you'd like. -->\n\n` +
-      `**Problem it solves:**\n\n` +
-      `**Proposed solution:**\n`
-    );
-    window.api.openExternal(`${repoBase}?labels=enhancement&title=${title}&body=${body}`);
-  }
+  // removed
 }
 
 async function refreshNotifications() {

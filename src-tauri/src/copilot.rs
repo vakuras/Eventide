@@ -35,6 +35,10 @@ pub fn resolve_copilot_path() -> String {
             .join("Links")
             .join("copilot.exe"),
         PathBuf::from(&local_app_data)
+            .join("Microsoft")
+            .join("WinGet")
+            .join("Packages"),
+        PathBuf::from(&local_app_data)
             .join("Programs")
             .join("copilot-cli")
             .join("copilot.exe"),
@@ -44,7 +48,20 @@ pub fn resolve_copilot_path() -> String {
     ];
 
     for candidate in &candidates {
-        if candidate.exists() {
+        if candidate.is_dir() {
+            // Search for copilot.exe recursively in WinGet Packages
+            if let Ok(entries) = std::fs::read_dir(candidate) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() && p.to_string_lossy().contains("GitHub.Copilot") {
+                        let exe = p.join("copilot.exe");
+                        if exe.exists() {
+                            return exe.to_string_lossy().to_string();
+                        }
+                    }
+                }
+            }
+        } else if candidate.exists() {
             return candidate.to_string_lossy().to_string();
         }
     }

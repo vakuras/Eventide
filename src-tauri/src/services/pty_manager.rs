@@ -82,8 +82,8 @@ impl PtyManager {
     }
 
     fn spawn_session(&self, session_id: &str, cwd: Option<&str>) -> Result<String, String> {
-        let spawn_cwd = cwd
-            .unwrap_or_else(|| dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".to_string()).leak());
+        let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".to_string());
+        let spawn_cwd = cwd.unwrap_or(&home);
 
         let pty_system = native_pty_system();
         let pair = pty_system
@@ -95,29 +95,14 @@ impl PtyManager {
             })
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-        let mut cmd = if self.use_cmd {
-            let mut c = CommandBuilder::new("cmd.exe");
-            c.args(["/c", &self.copilot_path, "--resume", session_id, "--yolo"]);
-            c
-        } else {
-            let mut c = CommandBuilder::new(&self.copilot_path);
-            c.args(["--resume", session_id, "--yolo"]);
-            c
-        };
+        // Spawn copilot directly (ConPTY handles it fine)
+        let mut cmd = CommandBuilder::new(&self.copilot_path);
+        cmd.args(["--resume", session_id, "--yolo"]);
         cmd.cwd(spawn_cwd);
+        eprintln!("[eventide] Spawning PTY: {} --resume {} --yolo (cwd: {})", self.copilot_path, session_id, spawn_cwd);
 
-        // Ensure proper environment — mirror the JS version's env setup
-        // portable-pty inherits env by default, but we explicitly set TERM
-        // and ensure critical Windows vars are present to prevent 0xC0000142
+        // Only add TERM — let portable-pty inherit the full process environment
         cmd.env("TERM", "xterm-256color");
-        if let Ok(val) = std::env::var("SystemRoot") { cmd.env("SystemRoot", val); }
-        if let Ok(val) = std::env::var("PATH") { cmd.env("PATH", val); }
-        if let Ok(val) = std::env::var("LOCALAPPDATA") { cmd.env("LOCALAPPDATA", val); }
-        if let Ok(val) = std::env::var("USERPROFILE") { cmd.env("USERPROFILE", val); }
-        if let Ok(val) = std::env::var("TEMP") { cmd.env("TEMP", val); }
-        if let Ok(val) = std::env::var("TMP") { cmd.env("TMP", val); }
-        if let Ok(val) = std::env::var("ComSpec") { cmd.env("ComSpec", val); }
-        if let Ok(val) = std::env::var("PROGRAMFILES") { cmd.env("PROGRAMFILES", val); }
 
         let child = pair
             .slave

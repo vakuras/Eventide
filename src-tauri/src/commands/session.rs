@@ -6,7 +6,27 @@ use crate::services::session_service::{SessionInfo, SearchResult};
 pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, String> {
     let guard = state.sessions.lock().map_err(|e| e.to_string())?;
     let svc = guard.as_ref().ok_or("Session service not initialized")?;
-    svc.list_sessions()
+    let mut sessions = svc.list_sessions()?;
+
+    // Enrich with tags
+    if let Ok(tags_guard) = state.tags.lock() {
+        if let Some(tag_svc) = tags_guard.as_ref() {
+            for session in &mut sessions {
+                session.tags = tag_svc.get_tags_for_session(&session.id);
+            }
+        }
+    }
+
+    // Enrich with resources
+    if let Ok(res_guard) = state.resources.lock() {
+        if let Some(res_svc) = res_guard.as_ref() {
+            for session in &mut sessions {
+                session.resources = res_svc.get_resources_for_session(&session.id);
+            }
+        }
+    }
+
+    Ok(sessions)
 }
 
 #[tauri::command]
