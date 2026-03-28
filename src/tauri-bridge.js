@@ -29,6 +29,7 @@ window.api = {
   addResource: (sessionId, url) => invoke('resource_add', { sessionId, url }),
   removeResource: (sessionId, key) => invoke('resource_remove', { sessionId, key }),
   getSessionStatus: (sessionId) => invoke('get_session_status', { sessionId }),
+  getSessionDiffs: (sessionId) => invoke('get_session_diffs', { sessionId }),
   openSession: (sessionId) => invoke('open_session', { sessionId }),
   newSession: (cwd) => invoke('new_session', { cwd: cwd || null }),
   killSession: (sessionId) => invoke('kill_pty', { sessionId }),

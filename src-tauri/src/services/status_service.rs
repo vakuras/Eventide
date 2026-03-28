@@ -43,6 +43,15 @@ pub struct FileChange {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FileDiff {
+    pub path: String,
+    pub full_path: String,
+    pub action: String,
+    pub diff: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TimelineEvent {
     pub time: String,
     #[serde(rename = "type")]
@@ -453,6 +462,129 @@ impl StatusService {
         events.truncate(20);
         events
     }
+
+    /// Extract unified diffs for each changed file from events.jsonl.
+    /// Only keeps the latest diff per file and filters out temp/session-internal files.
+    pub fn get_session_diffs(&self, session_id: &str) -> Vec<FileDiff> {
+        let session_dir = self.session_state_dir.join(session_id);
+        let events_path = session_dir.join("events.jsonl");
+        let file = match fs::File::open(&events_path) {
+            Ok(f) => f,
+            Err(_) => return Vec::new(),
+        };
+
+        let reader = BufReader::new(file);
+        // fullPath → (action, lastDiff)
+        let mut file_diffs: HashMap<String, (String, String)> = HashMap::new();
+
+        for line in reader.lines().flatten() {
+            let event: serde_json::Value = match serde_json::from_str(&line) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            if event.get("type").and_then(|t| t.as_str()) != Some("tool.execution_complete") {
+                continue;
+            }
+
+            let diff = match event.pointer("/data/result/detailedContent").and_then(|d| d.as_str()) {
+                Some(d) => d,
+                None => continue,
+            };
+
+            if !diff.contains("@@") || !diff.contains("diff --git") {
+                continue;
+            }
+
+            // Check for actual changes (+ or - lines)
+            let has_changes = diff.lines().any(|l| {
+                if l.starts_with("@@") || l.starts_with("diff ") || l.starts_with("index ")
+                    || l.starts_with("---") || l.starts_with("+++")
+                    || l.starts_with("create ") || l.starts_with("new file") {
+                    return false;
+                }
+                l.starts_with('+') || l.starts_with('-')
+            });
+            if !has_changes { continue; }
+
+            // Extract file path
+            let full_path = match diff.lines().find(|l| l.starts_with("+++ b/")) {
+                Some(l) => l[6..].replace('\\', "/"),
+                None => continue,
+            };
+
+            // Skip session-internal, temp, and non-source files
+            if full_path.contains(".copilot/session-state/")
+                || full_path.contains("/AppData/")
+                || full_path.contains("/Temp/") {
+                continue;
+            }
+            let last_segment = full_path.split('/').last().unwrap_or("");
+            if !last_segment.contains('.') { continue; }
+
+            let is_create = diff.contains("create file mode") || diff.contains("--- a/dev/null");
+            let action = if is_create { "A" } else { "M" }.to_string();
+
+            // Keep only latest diff per file
+            file_diffs.insert(full_path, (action, diff.to_string()));
+        }
+
+        // Find most common repo root prefix
+        let all_paths: Vec<&str> = file_diffs.keys().map(|s| s.as_str()).collect();
+        let best_root = find_best_root(&all_paths);
+
+        // Build results with relative paths, dedup by case-insensitive path
+        let mut seen: HashMap<String, usize> = HashMap::new();
+        let mut result: Vec<FileDiff> = Vec::new();
+
+        for (full_path, (action, diff)) in &file_diffs {
+            let rel_path = if !best_root.is_empty()
+                && full_path.to_lowercase().starts_with(&best_root.to_lowercase())
+            {
+                full_path[best_root.len()..].trim_start_matches('/').to_string()
+            } else if full_path.len() > 2 && &full_path[1..3] == ":/" {
+                // Different repo — keep last 2 segments
+                let parts: Vec<&str> = full_path.split('/').collect();
+                parts[parts.len().saturating_sub(2)..].join("/")
+            } else {
+                full_path.trim_start_matches('/').to_string()
+            };
+
+            let key = rel_path.to_lowercase();
+            if let Some(&idx) = seen.get(&key) {
+                result[idx].diff = diff.clone();
+            } else {
+                seen.insert(key, result.len());
+                result.push(FileDiff {
+                    path: rel_path,
+                    full_path: full_path.clone(),
+                    action: action.clone(),
+                    diff: diff.clone(),
+                });
+            }
+        }
+
+        result
+    }
+}
+
+/// Find the most common repo root prefix from a set of paths.
+fn find_best_root(paths: &[&str]) -> String {
+    let mut root_counts: HashMap<String, usize> = HashMap::new();
+    let re = regex::Regex::new(r"^[A-Za-z]:/[^/]+/[^/]+/").ok();
+    if let Some(re) = re {
+        for path in paths {
+            if let Some(m) = re.find(path) {
+                let root = m.as_str().to_lowercase();
+                *root_counts.entry(root).or_insert(0) += 1;
+            }
+        }
+    }
+    root_counts
+        .into_iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(root, _)| root)
+        .unwrap_or_default()
 }
 
 fn summarize_next_step(text: &str) -> Option<String> {
