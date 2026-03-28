@@ -85,26 +85,26 @@ impl PtyManager {
         let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".to_string());
         let spawn_cwd = cwd.unwrap_or(&home);
 
-        eprintln!("[eventide] Spawning: {} --resume {} --yolo (cwd: {})", self.copilot_path, session_id, spawn_cwd);
-
-        // Use std::process::Command with CREATE_NEW_PROCESS_GROUP to avoid
-        // inheriting Tauri/WebView2's handle table (which breaks ConPTY children).
-        // We spawn via conhost.exe to get a proper console for the child.
+        // Spawn via pty_host helper — a console-mode exe that creates ConPTY.
+        // Tauri GUI apps can't create ConPTY children directly (0xC0000142).
         use std::process::{Command, Stdio};
-        use std::os::windows::process::CommandExt;
 
-        const CREATE_NEW_CONSOLE: u32 = 0x00000010;
+        let self_exe = std::env::current_exe().map_err(|e| format!("Can't find self exe: {}", e))?;
+        let pty_host = self_exe.parent().unwrap().join("pty_host.exe");
 
-        let mut child = Command::new(&self.copilot_path)
-            .args(["--resume", session_id, "--yolo"])
-            .current_dir(spawn_cwd)
-            .env("TERM", "xterm-256color")
+        if !pty_host.exists() {
+            return Err(format!("pty_host.exe not found at {:?}", pty_host));
+        }
+
+        eprintln!("[eventide] Spawning via pty_host: --resume {} (cwd: {})", session_id, spawn_cwd);
+
+        let mut child = Command::new(&pty_host)
+            .args([&self.copilot_path, session_id, spawn_cwd, "120", "40"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .creation_flags(CREATE_NEW_CONSOLE)
             .spawn()
-            .map_err(|e| format!("Failed to spawn copilot: {}", e))?;
+            .map_err(|e| format!("Failed to spawn pty_host: {}", e))?;
 
         let stdin = child.stdin.take()
             .ok_or("Failed to get stdin")?;
@@ -219,9 +219,13 @@ impl PtyManager {
     }
 
     pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
-        // portable-pty resize requires the master handle, which we don't store separately.
-        // For now this is a no-op; resize support will be added when we store the master.
-        let _ = (session_id, cols, rows);
+        // Send resize escape sequence to pty_host: \x1b]666;resize;<cols>;<rows>\x07
+        let mut sessions = self.sessions.lock().unwrap();
+        if let Some(entry) = sessions.get_mut(session_id) {
+            let seq = format!("\x1b]666;resize;{};{}\x07", cols, rows);
+            let _ = entry.writer.write_all(seq.as_bytes());
+            let _ = entry.writer.flush();
+        }
         Ok(())
     }
 
