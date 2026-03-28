@@ -68,9 +68,7 @@ body {
   background: var(--bg-base);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  padding-right: 0;
+  padding: 0 0 0 16px;
   -webkit-app-region: drag;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
@@ -82,6 +80,8 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s;
+  margin-right: 12px;
+}
 }
 .titlebar-text:hover { color: var(--text); }
 
@@ -1115,7 +1115,7 @@ body {
   opacity: 0.3;
 }
 .empty-icon-img {
-  width: 120px;
+  width: 240px;
   opacity: 0.6;
 }
 

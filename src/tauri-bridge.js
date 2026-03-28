@@ -159,20 +159,25 @@ window.api = {
   },
 
   // ── Window controls ──────────────────────────────────────
-  minimizeWindow: () => window.__TAURI__.window.getCurrentWindow().minimize(),
-  maximizeWindow: () => window.__TAURI__.window.getCurrentWindow().toggleMaximize(),
-  closeWindow: () => window.__TAURI__.window.getCurrentWindow().close(),
+  minimizeWindow: () => invoke('plugin:window|minimize', { label: 'main' }),
+  maximizeWindow: () => invoke('plugin:window|toggle_maximize', { label: 'main' }),
+  closeWindow: () => invoke('plugin:window|close', { label: 'main' }),
 };
 
 // Wire window control buttons
-document.addEventListener('DOMContentLoaded', () => {
+const wireWindowControls = () => {
   const btnMin = document.getElementById('btn-minimize');
   const btnMax = document.getElementById('btn-maximize');
   const btnClose = document.getElementById('btn-close');
   if (btnMin) btnMin.addEventListener('click', () => window.api.minimizeWindow());
   if (btnMax) btnMax.addEventListener('click', () => window.api.maximizeWindow());
   if (btnClose) btnClose.addEventListener('click', () => window.api.closeWindow());
-});
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wireWindowControls);
+} else {
+  wireWindowControls();
+}
 
 // Restore persisted zoom on load
 invoke('get_settings').then(settings => {
