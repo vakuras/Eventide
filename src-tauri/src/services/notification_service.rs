@@ -153,6 +153,7 @@ impl NotificationService {
     }
 
     /// Push a notification programmatically (e.g., on session exit).
+    #[allow(dead_code)]
     pub fn push(&mut self, notification_type: &str, title: &str, body: &str, session_id: Option<&str>) -> Notification {
         let n = Notification {
             id: self.next_id,

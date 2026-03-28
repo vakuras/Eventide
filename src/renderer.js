@@ -75,12 +75,20 @@ const XTERM_THEMES = {
     brightBlue: '#1e66f5', brightMagenta: '#ea76cb', brightCyan: '#179299', brightWhite: '#bcc0cc'
   },
   midnight: {
-    background: '#121212', foreground: '#e8eaed', cursor: '#e8eaed', cursorAccent: '#121212',
-    selectionBackground: '#3c4043', selectionForeground: '#e8eaed',
-    black: '#3c4043', red: '#f28b82', green: '#81c995', yellow: '#fdd663',
+    background: '#1e2028', foreground: '#e8eaed', cursor: '#e8eaed', cursorAccent: '#1e2028',
+    selectionBackground: '#383b4a', selectionForeground: '#e8eaed',
+    black: '#383b4a', red: '#f28b82', green: '#81c995', yellow: '#fdd663',
     blue: '#8ab4f8', magenta: '#d7aefb', cyan: '#78d9ec', white: '#dadce0',
     brightBlack: '#5f6368', brightRed: '#f28b82', brightGreen: '#81c995', brightYellow: '#fdd663',
     brightBlue: '#8ab4f8', brightMagenta: '#d7aefb', brightCyan: '#78d9ec', brightWhite: '#e8eaed'
+  },
+  retro: {
+    background: '#2C2B2B', foreground: '#D5A200', cursor: '#C7C7C7', cursorAccent: '#2C2B2B',
+    selectionBackground: '#6B5B02', selectionForeground: '#D5A200',
+    black: '#000000', red: '#C91B00', green: '#00C200', yellow: '#C7C400',
+    blue: '#0225C7', magenta: '#CA30C7', cyan: '#00C5C7', white: '#C7C7C7',
+    brightBlack: '#686868', brightRed: '#FF6E67', brightGreen: '#5FFA68', brightYellow: '#FFFC67',
+    brightBlue: '#6871FF', brightMagenta: '#FF77FF', brightCyan: '#60FDFF', brightWhite: '#FFFFFF'
   }
 };
 

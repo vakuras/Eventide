@@ -71,6 +71,7 @@ pub fn resolve_copilot_path() -> String {
 }
 
 /// Returns true if the copilot path is a .cmd file (needs cmd.exe /c wrapper on Windows).
+#[allow(dead_code)]
 pub fn is_cmd_shim(path: &str) -> bool {
     path.to_lowercase().ends_with(".cmd")
 }

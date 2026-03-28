@@ -495,13 +495,38 @@ fn collect_matches_from_text(
     matches
 }
 
+/// Snap a byte index to the nearest valid UTF-8 char boundary.
+/// If `round_down` is false, snaps forward; if true, snaps backward won't go past len.
+fn snap_to_char_boundary(s: &str, index: usize, round_up: bool) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    if s.is_char_boundary(index) {
+        return index;
+    }
+    if round_up {
+        let mut i = index;
+        while i < s.len() && !s.is_char_boundary(i) {
+            i += 1;
+        }
+        i
+    } else {
+        let mut i = index;
+        while i > 0 && !s.is_char_boundary(i) {
+            i -= 1;
+        }
+        i
+    }
+}
+
 fn build_search_match(text: &str, match_index: usize, match_length: usize, source_label: &str) -> SearchMatch {
     let preview_radius = 42;
     let context_radius = 28;
-    let preview_start = match_index.saturating_sub(preview_radius);
-    let preview_end = (match_index + match_length + preview_radius).min(text.len());
-    let context_start = match_index.saturating_sub(context_radius);
-    let context_end = (match_index + match_length + context_radius).min(text.len());
+    let preview_start = snap_to_char_boundary(text, match_index.saturating_sub(preview_radius), false);
+    let preview_end = snap_to_char_boundary(text, (match_index + match_length + preview_radius).min(text.len()), true);
+    let context_start = snap_to_char_boundary(text, match_index.saturating_sub(context_radius), false);
+    let context_end = snap_to_char_boundary(text, (match_index + match_length + context_radius).min(text.len()), true);
+    let safe_match_end = snap_to_char_boundary(text, (match_index + match_length).min(text.len()), true);
 
     let prefix = if preview_start > 0 { "…" } else { "" };
     let suffix = if preview_end < text.len() { "…" } else { "" };
@@ -509,8 +534,8 @@ fn build_search_match(text: &str, match_index: usize, match_length: usize, sourc
     SearchMatch {
         preview: format!("{}{}{}", prefix, &text[preview_start..preview_end], suffix),
         before_text: text[context_start..match_index].to_string(),
-        match_text: text[match_index..match_index + match_length].to_string(),
-        after_text: text[match_index + match_length..context_end].to_string(),
+        match_text: text[match_index..safe_match_end].to_string(),
+        after_text: text[safe_match_end..context_end].to_string(),
         source_label: source_label.to_string(),
     }
 }
@@ -723,5 +748,27 @@ mod tests {
         assert!(!dir.path().join("empty-1").exists());
         assert!(dir.path().join("has-summary").exists());
         assert!(dir.path().join("has-events").exists());
+    }
+
+    // --- UTF-8 char boundary safety ---
+
+    #[test]
+    fn test_snap_to_char_boundary() {
+        let s = "hello—world"; // em dash is 3 bytes at positions 5,6,7
+        assert_eq!(snap_to_char_boundary(s, 5, false), 5); // already valid
+        assert_eq!(snap_to_char_boundary(s, 6, false), 5); // snap back to start of —
+        assert_eq!(snap_to_char_boundary(s, 7, false), 5); // snap back
+        assert_eq!(snap_to_char_boundary(s, 6, true), 8);  // snap forward past —
+        assert_eq!(snap_to_char_boundary(s, 7, true), 8);  // snap forward
+        assert_eq!(snap_to_char_boundary(s, 100, true), s.len()); // past end
+    }
+
+    #[test]
+    fn test_build_search_match_multibyte() {
+        // Should not panic on text containing multi-byte UTF-8 characters
+        let text = "Copilot uses AI — so always check for mistakes and verify results.";
+        let idx = text.find("check").unwrap();
+        let result = build_search_match(text, idx, 5, "User");
+        assert!(result.match_text.contains("check"));
     }
 }

@@ -1,14 +1,11 @@
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-
-use crate::copilot;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,13 +21,10 @@ struct PtySession {
     alive: bool,
     opened_at: Instant,
     last_data_at: Option<Instant>,
-    data_bytes_since_idle: usize,
-    cwd: String,
 }
 
 pub struct PtyManager {
     copilot_path: String,
-    use_cmd: bool,
     app_handle: AppHandle,
     sessions: Mutex<HashMap<String, PtySession>>,
     max_concurrent: Mutex<u32>,
@@ -38,18 +32,12 @@ pub struct PtyManager {
 
 impl PtyManager {
     pub fn new(copilot_path: String, app_handle: AppHandle) -> Self {
-        let use_cmd = copilot::is_cmd_shim(&copilot_path);
         Self {
             copilot_path,
-            use_cmd,
             app_handle,
             sessions: Mutex::new(HashMap::new()),
             max_concurrent: Mutex::new(5),
         }
-    }
-
-    pub fn set_max_concurrent(&self, max: u32) {
-        *self.max_concurrent.lock().unwrap() = max;
     }
 
     pub fn open_session(&self, session_id: &str, cwd: Option<&str>) -> Result<String, String> {
@@ -196,8 +184,6 @@ impl PtyManager {
             alive: true,
             opened_at: Instant::now(),
             last_data_at: None,
-            data_bytes_since_idle: 0,
-            cwd: spawn_cwd.to_string(),
         };
 
         self.sessions.lock().unwrap().insert(session_id.to_string(), entry);
@@ -239,17 +225,6 @@ impl PtyManager {
         }
         sessions.remove(session_id);
         Ok(())
-    }
-
-    pub fn kill_all(&self) {
-        let mut sessions = self.sessions.lock().unwrap();
-        for (_, entry) in sessions.iter_mut() {
-            if entry.alive {
-                *entry.kill_flag.lock().unwrap() = true;
-                entry.alive = false;
-            }
-        }
-        sessions.clear();
     }
 
     pub fn get_active_sessions(&self) -> Vec<ActiveSession> {

@@ -36,7 +36,7 @@ pub struct Settings {
 fn default_max_concurrent() -> u32 { 5 }
 fn default_sidebar_width() -> u32 { 280 }
 fn default_last_active_tab() -> String { "active".to_string() }
-fn default_theme() -> String { "mocha".to_string() }
+fn default_theme() -> String { "midnight".to_string() }
 fn default_zoom_factor() -> f64 { 1.0 }
 
 impl Default for Settings {
@@ -131,7 +131,7 @@ mod tests {
         let svc = SettingsService::new(dir.path());
         let s = svc.get();
         assert_eq!(s.max_concurrent, 5);
-        assert_eq!(s.theme, "mocha");
+        assert_eq!(s.theme, "midnight");
         assert_eq!(s.zoom_factor, 1.0);
         assert!(!s.sidebar_collapsed);
         assert!(s.open_tabs.is_empty());
@@ -175,7 +175,7 @@ mod tests {
         let dir = temp_dir();
         let mut svc = SettingsService::new(dir.path());
         svc.load();
-        assert_eq!(svc.get().theme, "mocha");
+        assert_eq!(svc.get().theme, "midnight");
     }
 
     #[test]
@@ -184,6 +184,6 @@ mod tests {
         fs::write(dir.path().join("session-gui-settings.json"), "not json!").unwrap();
         let mut svc = SettingsService::new(dir.path());
         svc.load();
-        assert_eq!(svc.get().theme, "mocha");
+        assert_eq!(svc.get().theme, "midnight");
     }
 }

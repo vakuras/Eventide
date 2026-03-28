@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use super::settings_service::SettingsService;
 use super::session_service::SessionService;
