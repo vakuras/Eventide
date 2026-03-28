@@ -876,7 +876,7 @@ function setUpdateBadge(show, version, notify) {
     badge.title = `v${version} available`;
     badge.classList.remove('hidden');
     if (notify) {
-      showToast({ type: 'info', title: 'Update ready', body: `v${version} downloaded — will apply next time you close DeepSky.` });
+      showToast({ type: 'info', title: 'Update ready', body: `v${version} downloaded — will apply next time you close Eventide.` });
     }
   } else if (badge) {
     badge.classList.add('hidden');

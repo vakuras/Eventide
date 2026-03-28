@@ -82,10 +82,10 @@ impl SessionService {
         let yaml_content = fs::read_to_string(&yaml_path).ok()?;
         let meta: WorkspaceMeta = serde_yaml::from_str(&yaml_content).unwrap_or_default();
 
-        // Title resolution: .eventide-title > .deepsky-title > summary > events > fallback
+        // Title resolution: .eventide-title > .deepsky-title (backward compat) > summary > events > fallback
         let (title, is_custom) = self.resolve_title(session_id, &session_dir, &meta);
 
-        // CWD resolution: .eventide-cwd > .deepsky-cwd > workspace.yaml cwd
+        // CWD resolution: .eventide-cwd > .deepsky-cwd (backward compat) > workspace.yaml cwd
         let cwd = self.resolve_cwd(&session_dir, &meta);
 
         // Timestamps
@@ -130,7 +130,7 @@ impl SessionService {
         session_dir: &Path,
         meta: &WorkspaceMeta,
     ) -> (String, bool) {
-        // 1. Custom title (.eventide-title, fallback .deepsky-title)
+        // 1. Custom title (.eventide-title, backward compat .deepsky-title)
         for filename in &[".eventide-title", ".deepsky-title"] {
             if let Ok(content) = fs::read_to_string(session_dir.join(filename)) {
                 let trimmed = content.trim().to_string();
@@ -189,7 +189,7 @@ impl SessionService {
     }
 
     fn resolve_cwd(&self, session_dir: &Path, meta: &WorkspaceMeta) -> String {
-        // 1. .eventide-cwd / .deepsky-cwd
+        // 1. .eventide-cwd / .deepsky-cwd (backward compat)
         for filename in &[".eventide-cwd", ".deepsky-cwd"] {
             if let Ok(content) = fs::read_to_string(session_dir.join(filename)) {
                 let trimmed = content.trim().to_string();
