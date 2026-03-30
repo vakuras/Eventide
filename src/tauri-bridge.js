@@ -126,12 +126,33 @@ window.api = {
   getVersion: () => invoke('get_app_version'),
   getChangelog: () => invoke('get_app_changelog'),
 
-  // ── Updates (Tauri built-in updater — stubs for now) ──────
-  checkForUpdates: () => Promise.resolve(null),
-  installUpdate: () => Promise.resolve(),
-  getUpdateStatus: () => Promise.resolve({ status: 'not-available' }),
+  // ── Updates (Tauri updater plugin) ──────────────────────
+  checkForUpdates: async () => {
+    try {
+      const { check } = window.__TAURI__['updater'] || {};
+      if (!check) return { status: 'not-available' };
+      const update = await check();
+      if (update?.available) {
+        return { status: 'available', info: { version: update.version, date: update.date, body: update.body } };
+      }
+      return { status: 'not-available' };
+    } catch {
+      return { status: 'error', error: 'Failed to check for updates' };
+    }
+  },
+  installUpdate: async () => {
+    try {
+      const { check } = window.__TAURI__['updater'] || {};
+      if (!check) return;
+      const update = await check();
+      if (update?.available) {
+        await update.downloadAndInstall();
+      }
+    } catch {}
+  },
+  getUpdateStatus: () => Promise.resolve({ status: 'idle' }),
+  applyUpdateSettings: () => Promise.resolve(),
   onUpdateStatus: (callback) => {
-    // TODO: Wire up Tauri updater events
     return () => {};
   },
 

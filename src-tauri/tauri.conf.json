@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/v2/tooling/cli/schema.json",
   "productName": "Eventide",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "identifier": "com.eventide.desktop",
   "build": {
     "frontendDist": "../dist-tauri",
@@ -41,5 +41,13 @@
       }
     },
     "publisher": "vakuras"
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/vakuras/Eventide/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
   }
 }

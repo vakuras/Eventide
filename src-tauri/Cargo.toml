@@ -1,6 +1,6 @@
 [package]
 name = "eventide"
-version = "0.4.0"
+version = "0.4.1"
 description = "Your command center for GitHub Copilot CLI"
 authors = ["vakuras"]
 license = "MIT"
@@ -22,6 +22,7 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

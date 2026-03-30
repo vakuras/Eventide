@@ -2,6 +2,15 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.4.1] - 2026-03-30
+
+### Added
+- **Auto-update support** — wired up Tauri updater plugin to check for and install updates from GitHub Releases
+- **Embedded changelog** — About tab now shows the full changelog (compiled into the binary)
+
+### Fixed
+- Changelog was empty in the About tab (was looking for file on disk instead of embedding)
+
 ## [0.4.0] - 2026-03-30
 
 ### Added

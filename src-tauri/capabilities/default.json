@@ -18,6 +18,9 @@
     "shell:allow-open",
     "notification:default",
     "notification:allow-notify",
-    "fs:default"
+    "fs:default",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
