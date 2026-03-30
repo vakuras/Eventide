@@ -1,6 +1,6 @@
 [package]
 name = "eventide"
-version = "0.2.5"
+version = "0.3.0"
 description = "Your command center for GitHub Copilot CLI"
 authors = ["vakuras"]
 license = "MIT"
