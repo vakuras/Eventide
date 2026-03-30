@@ -31,6 +31,8 @@ pub struct Settings {
     pub prompt_for_workdir: bool,
     #[serde(default)]
     pub default_workdir: String,
+    #[serde(default = "default_auto_update")]
+    pub auto_update_enabled: bool,
 }
 
 fn default_max_concurrent() -> u32 { 5 }
@@ -38,6 +40,7 @@ fn default_sidebar_width() -> u32 { 280 }
 fn default_last_active_tab() -> String { "active".to_string() }
 fn default_theme() -> String { "midnight".to_string() }
 fn default_zoom_factor() -> f64 { 1.0 }
+fn default_auto_update() -> bool { true }
 
 impl Default for Settings {
     fn default() -> Self {
@@ -55,6 +58,7 @@ impl Default for Settings {
             zoom_factor: default_zoom_factor(),
             prompt_for_workdir: false,
             default_workdir: String::new(),
+            auto_update_enabled: default_auto_update(),
         }
     }
 }

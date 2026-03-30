@@ -64,7 +64,7 @@ function saveTabState() {
 const XTERM_THEMES = {
   mocha: {
     background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc', cursorAccent: '#1e1e2e',
-    selectionBackground: '#45475a', selectionForeground: '#cdd6f4',
+    selectionBackground: '#585b70', selectionForeground: '#cdd6f4',
     black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
     blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#bac2de',
     brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1', brightYellow: '#f9e2af',
@@ -72,7 +72,7 @@ const XTERM_THEMES = {
   },
   latte: {
     background: '#eff1f5', foreground: '#4c4f69', cursor: '#dc8a78', cursorAccent: '#eff1f5',
-    selectionBackground: '#acb0be', selectionForeground: '#4c4f69',
+    selectionBackground: '#8c8fa1', selectionForeground: '#4c4f69',
     black: '#5c5f77', red: '#d20f39', green: '#40a02b', yellow: '#df8e1d',
     blue: '#1e66f5', magenta: '#ea76cb', cyan: '#179299', white: '#acb0be',
     brightBlack: '#6c6f85', brightRed: '#d20f39', brightGreen: '#40a02b', brightYellow: '#df8e1d',
@@ -141,6 +141,7 @@ const notificationPanel = document.getElementById('notification-panel');
 const notificationListEl = document.getElementById('notification-list');
 const feedbackPanel = null; // removed
 const toastContainer = document.getElementById('toast-container');
+const autoUpdateToggle = document.getElementById('auto-update-enabled');
 
 const titlebar = document.getElementById('titlebar');
 const NOTIF_ICONS = { 'task-done': '✓', 'needs-input': '◌', 'error': '!', 'info': '·' };
@@ -516,6 +517,15 @@ sessionList.addEventListener('click', (e) => {
     if (sid) handleCwdClick(sid);
     return;
   }
+  // Tag overflow click → expand hidden tags
+  const overflowTag = e.target.closest('.tag-overflow');
+  if (overflowTag) {
+    e.stopPropagation();
+    overflowTag.classList.add('expanded');
+    const hidden = overflowTag.parentElement.querySelector('.tags-hidden');
+    if (hidden) hidden.classList.add('expanded');
+    return;
+  }
   const titleEl = e.target.closest('.session-title');
   if (titleEl) {
     e.stopPropagation();
@@ -568,6 +578,7 @@ async function init() {
   maxConcurrentInput.value = settings.maxConcurrent;
   promptWorkdirInput.checked = !!settings.promptForWorkdir;
   defaultWorkdirInput.value = settings.defaultWorkdir || '';
+  autoUpdateToggle.checked = settings.autoUpdateEnabled !== false;
   lastExpandedSidebarWidth = settings.sidebarWidth || 280;
   lastDiffPanelWidth = settings.diffPanelWidth || 500;
   sidebarHidden = !!settings.sidebarCollapsed;
@@ -745,7 +756,17 @@ async function init() {
   btnToggleDiff.addEventListener('click', toggleDiffPanel);
   diffPanel.querySelector('.diff-panel-close').addEventListener('click', () => {
     diffPanel.classList.add('collapsed');
+    diffPanel.style.width = '';
     btnToggleDiff.classList.remove('active');
+    let fitted = false;
+    diffPanel.addEventListener('transitionend', function onEnd(e) {
+      if (e.propertyName === 'width') {
+        diffPanel.removeEventListener('transitionend', onEnd);
+        fitted = true;
+        fitActiveTerminal();
+      }
+    });
+    setTimeout(() => { if (!fitted) fitActiveTerminal(); }, 350);
   });
   diffViewToggle.addEventListener('click', () => {
     diffViewMode = diffViewMode === 'unified' ? 'split' : 'unified';
@@ -842,10 +863,21 @@ function openSettings() {
   populateAboutSection();
 }
 
+// Settings tab switching
+settingsOverlay.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.settingsTab;
+    settingsOverlay.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.settingsTab === target));
+    settingsOverlay.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.toggle('active', p.dataset.settingsPanel === target));
+  });
+});
+
 async function populateAboutSection() {
   const version = await window.api.getVersion();
   const changelog = await window.api.getChangelog();
   document.getElementById('about-version').textContent = `v${version}`;
+  const aboutVersionTab = document.getElementById('about-version-tab');
+  if (aboutVersionTab) aboutVersionTab.textContent = `Eventide v${version}`;
   const changelogEl = document.getElementById('about-changelog');
   changelogEl.textContent = changelog || 'No changelog available.';
 
@@ -2128,11 +2160,23 @@ function toggleDiffPanel() {
   if (!collapsed) {
     diffPanel.style.width = lastDiffPanelWidth + 'px';
     if (activeSessionId) updateDiffPanel(activeSessionId);
+  } else {
+    diffPanel.style.width = '';
   }
   if (!collapsed && !statusPanel.classList.contains('collapsed')) {
     statusPanel.classList.add('collapsed');
     btnToggleStatus.classList.remove('active');
   }
+  // Refit terminal once the CSS width transition finishes
+  let fitted = false;
+  diffPanel.addEventListener('transitionend', function onEnd(e) {
+    if (e.propertyName === 'width') {
+      diffPanel.removeEventListener('transitionend', onEnd);
+      fitted = true;
+      fitActiveTerminal();
+    }
+  });
+  setTimeout(() => { if (!fitted) fitActiveTerminal(); }, 350);
 }
 
 async function updateDiffPanel(sessionId) {
@@ -3011,6 +3055,11 @@ btnPickDefaultWorkdir.addEventListener('click', async () => {
 btnClearDefaultWorkdir.addEventListener('click', () => {
   defaultWorkdirInput.value = '';
   window.api.updateSettings({ defaultWorkdir: '' });
+});
+
+autoUpdateToggle.addEventListener('change', (e) => {
+  window.api.updateSettings({ autoUpdateEnabled: e.target.checked });
+  if (window.api.applyUpdateSettings) window.api.applyUpdateSettings();
 });
 
 // Notification functions

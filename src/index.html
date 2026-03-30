@@ -93,23 +93,23 @@
             </div>
           </div>
 
-        </div>
-      </div>
+          <!-- Diff panel (right sidebar, collapsible — same style as status) -->
+          <div id="diff-panel" class="collapsed">
+            <div id="diff-panel-header">
+              <h3>Diff View</h3>
+              <div id="diff-panel-controls">
+                <button id="diff-view-toggle" class="diff-toggle-btn" title="Toggle unified/split view">Split</button>
+                <button class="diff-panel-close" title="Close">×</button>
+              </div>
+            </div>
+            <div id="diff-panel-content">
+              <div id="diff-file-list"></div>
+              <div id="diff-view-area">
+                <div class="diff-empty">Select a file to view changes</div>
+              </div>
+            </div>
+          </div>
 
-      <!-- Diff panel (overlay, collapsible) -->
-      <div id="diff-panel" class="collapsed">
-        <div id="diff-panel-header">
-          <h3>Diff View</h3>
-          <div id="diff-panel-controls">
-            <button id="diff-view-toggle" class="diff-toggle-btn" title="Toggle unified/split view">Split</button>
-            <button class="diff-panel-close" title="Close">×</button>
-          </div>
-        </div>
-        <div id="diff-panel-content">
-          <div id="diff-file-list"></div>
-          <div id="diff-view-area">
-            <div class="diff-empty">Select a file to view changes</div>
-          </div>
         </div>
       </div>
 
@@ -137,93 +137,137 @@
         <h2>Settings</h2>
         <button class="settings-close">×</button>
       </div>
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-settings-tab="general">General</button>
+        <button class="settings-tab" data-settings-tab="updates">Updates</button>
+        <button class="settings-tab" data-settings-tab="shortcuts">Shortcuts</button>
+        <button class="settings-tab" data-settings-tab="about">About</button>
+      </div>
       <div class="settings-body">
-        <div class="settings-group">
-          <label class="settings-label">Max Open Sessions</label>
-          <p class="settings-description">Number of sessions to keep alive in the background. Older sessions are closed when the limit is reached.</p>
-          <div class="settings-input-row">
-            <input type="number" id="max-concurrent" min="1" max="20" value="5">
-          </div>
-        </div>
-        <div class="settings-group">
-          <label class="settings-label">Working Directory</label>
-          <p class="settings-description">Prompt for a working directory when creating a new session.</p>
-          <div class="settings-input-row">
-            <label class="toggle-label">
-              <input type="checkbox" id="prompt-workdir">
-              <span>Ask on new session</span>
-            </label>
-          </div>
-          <p class="settings-description" style="margin-top: 10px;">Default directory for new sessions (used when prompt is off, or as the starting path in the picker).</p>
-          <div class="settings-input-row">
-            <input type="text" id="default-workdir" placeholder="User home" readonly>
-            <button id="btn-pick-default-workdir" class="btn-secondary">Browse…</button>
-            <button id="btn-clear-default-workdir" class="btn-secondary" title="Reset to user home">✕</button>
-          </div>
-        </div>
-        <div class="settings-group">
-          <label class="settings-label">Theme</label>
-          <div class="theme-switcher">
-            <button class="theme-option active" data-theme="mocha">
-              <div class="theme-preview dark"></div>
-              Mocha
-            </button>
-            <button class="theme-option" data-theme="latte">
-              <div class="theme-preview light"></div>
-              Latte
-            </button>
-            <button class="theme-option" data-theme="midnight">
-              <div class="theme-preview midnight"></div>
-              Midnight
-            </button>
-            <button class="theme-option" data-theme="retro">
-              <div class="theme-preview retro"></div>
-              Retro
-            </button>
-          </div>
-        </div>
 
-        <div class="settings-divider"></div>
-
-        <!-- Keyboard Shortcuts -->
-        <div class="settings-group">
-          <label class="settings-label">Keyboard Shortcuts</label>
-          <div id="shortcuts-table" class="shortcuts-table">
-            <div class="shortcut-row"><span class="shortcut-action">New session</span><kbd>Ctrl+N</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Close tab</span><kbd>Ctrl+W</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Restore closed tab</span><kbd>Ctrl+Shift+T</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Next tab</span><kbd>Ctrl+Tab</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Previous tab</span><kbd>Ctrl+Shift+Tab</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Toggle status panel</span><kbd>Ctrl+I</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Search in terminal</span><kbd>Ctrl+F</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Copy (with selection)</span><kbd>Ctrl+C</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Paste</span><kbd>Ctrl+V</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Delete word</span><kbd>Ctrl+Backspace</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Newline (no execute)</span><kbd>Shift+Enter</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Zoom in</span><kbd>Ctrl+=</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Zoom out</span><kbd>Ctrl+-</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Reset zoom</span><kbd>Ctrl+0</kbd></div>
-            <div class="shortcut-row"><span class="shortcut-action">Close / clear</span><kbd>Escape</kbd></div>
+        <!-- General tab -->
+        <div class="settings-tab-panel active" data-settings-panel="general">
+          <div class="settings-group">
+            <label class="settings-label">Sessions</label>
+            <div class="settings-row">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Max open sessions</span>
+                <span class="settings-row-desc">Older sessions are closed when the limit is reached</span>
+              </div>
+              <input type="number" id="max-concurrent" class="settings-number" min="1" max="20" value="5">
+            </div>
           </div>
-        </div>
 
-        <div class="settings-divider"></div>
+          <div class="settings-group">
+            <label class="settings-label">Working Directory</label>
+            <div class="settings-row">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Ask on new session</span>
+                <span class="settings-row-desc">Prompt for a directory when creating a session</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="prompt-workdir">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Default directory</span>
+                <span class="settings-row-desc">Used when prompt is off, or as the picker's starting path</span>
+              </div>
+            </div>
+            <div class="settings-input-row" style="margin-top: 4px;">
+              <input type="text" id="default-workdir" placeholder="User home" readonly>
+              <button id="btn-pick-default-workdir" class="btn-secondary">Browse…</button>
+              <button id="btn-clear-default-workdir" class="btn-secondary" title="Reset to user home">✕</button>
+            </div>
+          </div>
 
-        <!-- About -->
-        <div class="settings-group">
-          <label class="settings-label">About</label>
-          <div id="about-version" class="about-version"></div>
-          <div id="update-section" class="update-section">
-            <div id="update-status" class="update-status hidden"></div>
-            <div id="update-progress" class="update-progress hidden">
-              <div id="update-progress-bar" class="update-progress-bar"></div>
+          <div class="settings-group">
+            <label class="settings-label">Appearance</label>
+            <div class="theme-switcher">
+              <button class="theme-option active" data-theme="mocha">
+                <div class="theme-preview dark"></div>
+                Mocha
+              </button>
+              <button class="theme-option" data-theme="latte">
+                <div class="theme-preview light"></div>
+                Latte
+              </button>
+              <button class="theme-option" data-theme="midnight">
+                <div class="theme-preview midnight"></div>
+                Midnight
+              </button>
+              <button class="theme-option" data-theme="retro">
+                <div class="theme-preview retro"></div>
+                Retro
+              </button>
             </div>
           </div>
         </div>
-        <div class="settings-group">
-          <label class="settings-label">Changelog</label>
-          <div id="about-changelog" class="about-changelog"></div>
+
+        <!-- Updates tab -->
+        <div class="settings-tab-panel" data-settings-panel="updates">
+          <div class="settings-group">
+            <label class="settings-label">Auto-Update</label>
+            <div class="settings-row">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Enable auto-update</span>
+                <span class="settings-row-desc">Automatically check for and install updates</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="auto-update-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <label class="settings-label">Status</label>
+            <div id="about-version" class="about-version"></div>
+            <div id="update-section" class="update-section">
+              <div id="update-status" class="update-status hidden"></div>
+              <div id="update-progress" class="update-progress hidden">
+                <div id="update-progress-bar" class="update-progress-bar"></div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Shortcuts tab -->
+        <div class="settings-tab-panel" data-settings-panel="shortcuts">
+          <div class="settings-group">
+            <div id="shortcuts-table" class="shortcuts-table">
+              <div class="shortcut-row"><span class="shortcut-action">New session</span><kbd>Ctrl+N</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Close tab</span><kbd>Ctrl+W</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Restore closed tab</span><kbd>Ctrl+Shift+T</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Next tab</span><kbd>Ctrl+Tab</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Previous tab</span><kbd>Ctrl+Shift+Tab</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Toggle status panel</span><kbd>Ctrl+I</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Search in terminal</span><kbd>Ctrl+F</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Copy (with selection)</span><kbd>Ctrl+C</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Paste</span><kbd>Ctrl+V</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Delete word</span><kbd>Ctrl+Backspace</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Newline (no execute)</span><kbd>Shift+Enter</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Zoom in</span><kbd>Ctrl+=</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Zoom out</span><kbd>Ctrl+-</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Reset zoom</span><kbd>Ctrl+0</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Close / clear</span><kbd>Escape</kbd></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- About tab -->
+        <div class="settings-tab-panel" data-settings-panel="about">
+          <div class="settings-group">
+            <div id="about-version-tab" class="about-version"></div>
+          </div>
+          <div class="settings-group">
+            <label class="settings-label">Changelog</label>
+            <div id="about-changelog" class="about-changelog"></div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
