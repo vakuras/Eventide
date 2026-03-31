@@ -123,8 +123,15 @@ function resolveCopilotPath() {
 
 function createWindow() {
   const theme = settingsService.get().theme || 'midnight';
-  const bg = theme === 'latte' ? '#eff1f5' : '#1e1e2e';
-  const fg = theme === 'latte' ? '#4c4f69' : '#cdd6f4';
+  const THEME_COLORS = {
+    mocha: { bg: '#1e1e2e', fg: '#cdd6f4' },
+    latte: { bg: '#eff1f5', fg: '#4c4f69' },
+    midnight: { bg: '#1e2028', fg: '#e8eaed' },
+    retro: { bg: '#2C2B2B', fg: '#D5A200' },
+  };
+  const colors = THEME_COLORS[theme] || THEME_COLORS.midnight;
+  const bg = colors.bg;
+  const fg = colors.fg;
 
   const winOptions = {
     width: 1400,
@@ -290,10 +297,15 @@ app.whenReady().then(async () => {
 
     // Update window chrome for theme changes
     if (partial.theme && mainWindow && !mainWindow.isDestroyed()) {
-      const bg = partial.theme === 'latte' ? '#eff1f5' : '#1e1e2e';
-      const fg = partial.theme === 'latte' ? '#4c4f69' : '#cdd6f4';
-      mainWindow.setTitleBarOverlay({ color: bg, symbolColor: fg });
-      mainWindow.setBackgroundColor(bg);
+      const THEME_COLORS = {
+        mocha: { bg: '#1e1e2e', fg: '#cdd6f4' },
+        latte: { bg: '#eff1f5', fg: '#4c4f69' },
+        midnight: { bg: '#1e2028', fg: '#e8eaed' },
+        retro: { bg: '#2C2B2B', fg: '#D5A200' },
+      };
+      const colors = THEME_COLORS[partial.theme] || THEME_COLORS.midnight;
+      mainWindow.setTitleBarOverlay({ color: colors.bg, symbolColor: colors.fg });
+      mainWindow.setBackgroundColor(colors.bg);
     }
 
     return updated;
