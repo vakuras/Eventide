@@ -2,6 +2,45 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.0] - 2026-03-31
+
+### Added
+- **4 themes** — Midnight (default), Mocha, Latte, and Retro (Apple Classic) with full xterm palettes and preview swatches
+- **Diff panel** — dedicated sidebar with file list, unified/split view toggle, drag-to-resize, and Ctrl+D shortcut
+- **Session diffs in Electron** — `getSessionDiffs` implemented in the Electron backend (previously Tauri-only)
+- **Tauri window controls** — custom minimize/maximize/close buttons for frameless Tauri window
+- **Runtime flavor in About** — shows "Eventide (Electron)" or "Eventide (Tauri)" with version
+- **Tauri auto-update on startup** — checks for updates on launch when enabled (respects opt-out)
+- **Resource commands in Tauri** — `resource_add` and `resource_remove` Tauri commands with full URL parsing
+
+### Changed
+- **Panels overlay terminal** — status and diff panels slide over the terminal instead of resizing it
+- **Panels are mutually exclusive** — opening one closes the other
+- **Panel buttons disabled when no session** — grayed out and non-clickable without an active session
+- **Settings consolidated to 3 tabs** — General, Shortcuts, About (Updates merged into About)
+- **Fixed settings modal height** — consistent 560px across all tabs
+- **Default theme is Midnight** — both Electron and Tauri default to midnight
+- **Settings file renamed** — `session-gui-settings.json` → `eventide-settings.json`
+- **Session files renamed** — `.deepsky-title`/`.deepsky-cwd` → `.eventide-title`/`.eventide-cwd`
+- **Window hides until ready** — no more flash of default icon or unstyled content on launch
+- **Icons consolidated** — single `resources/` directory serves both Electron and Tauri
+- **Installer names aligned** — `Eventide-Electron-Setup-X.X.X.exe` and `Eventide-Tauri-Setup-X.X.X.exe`
+- **Same app ID** — installing one flavor automatically uninstalls the other
+
+### Removed
+- **Feedback panel** — removed button, dropdown, and all related code
+- **Beta/prerelease channel** — "Early adapter" toggle removed; stable-only updates
+- **"New Session" button on empty state** — cleaner empty state with just the Eventide badge
+- **Duplicate icon files** — removed `eventide.ico` and `src-tauri/icons/` in favor of `resources/`
+
+### Fixed
+- **Copilot path fallback bug** — `return bin` (out of scope) → `return 'copilot'`
+- **statusPanelSections not persisting** — added to settings DEFAULTS so `update()` no longer filters it out
+- **Rust settings test** — was writing to wrong filename (`session-gui-settings.json`)
+- **Titlebar colors for all themes** — Electron window chrome now matches midnight/mocha/latte/retro
+- **Empty state image path** — fixed for both Electron (`../resources/`) and Tauri (`eventide.png`)
+- **Status panel icon** — restored to ☷ (trigram) from clipboard emoji
+
 ## [0.5.0] - 2026-03-31
 
 ### Changed
