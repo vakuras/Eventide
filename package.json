@@ -1,14 +1,48 @@
 {
   "name": "eventide",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Your command center for GitHub Copilot CLI — manage, search, and switch between sessions from a sleek desktop app.",
+  "main": "src/main.js",
   "author": "vakuras",
   "license": "MIT",
   "scripts": {
-    "build": "node scripts/build-tauri-frontend.js",
-    "dev": "npm run build && npx tauri dev",
-    "tauri:build": "npm run build && npx tauri build",
-    "test": "vitest run"
+    "build": "esbuild src/renderer.js --bundle --outfile=dist/renderer.js --platform=browser --format=iife",
+    "start": "npm run build && electron . --no-sandbox",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder --win",
+    "tauri:frontend": "node scripts/build-tauri-frontend.js",
+    "tauri:dev": "npm run tauri:frontend && npx tauri dev",
+    "tauri:build": "npm run tauri:frontend && npx tauri build"
+  },
+  "build": {
+    "appId": "com.vakuras.eventide",
+    "productName": "Eventide",
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "eventide.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "vakuras",
+      "repo": "Eventide"
+    },
+    "forceCodeSigning": false
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
@@ -16,10 +50,14 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
-    "js-yaml": "^4.1.0"
+    "electron-updater": "^6.7.3",
+    "js-yaml": "^4.1.0",
+    "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.7.0",
     "esbuild": "^0.27.3",
     "jsdom": "^27.0.1",
     "vitest": "^4.0.18"

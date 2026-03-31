@@ -2,14 +2,25 @@
 
 All notable changes to Eventide are documented here.
 
-## [0.4.1] - 2026-03-30
+## [0.5.0] - 2026-03-31
+
+### Changed
+- **Dual-platform architecture** — Eventide now supports both Electron and Tauri builds from a single codebase
+  - `npm start` / `npm run dist` → Electron build (full-featured, ~150MB)
+  - `npm run tauri:dev` / `npm run tauri:build` → Tauri build (lightweight, ~12MB)
+- **Electron frontend rebased on DeepSky v0.9.0** — brings all DeepSky features:
+  - Pre-warmed standby sessions for instant startup
+  - Custom notification popups (themed Catppuccin toasts)
+  - Full notification service with file watcher
+  - Session eviction with graceful shutdown
+  - 20 unit tests
+- **Tauri backend preserved** — all Rust services (PTY, sessions, settings, tags, resources, status, notifications) unchanged
 
 ### Added
-- **Auto-update support** — wired up Tauri updater plugin to check for and install updates from GitHub Releases
-- **Embedded changelog** — About tab now shows the full changelog (compiled into the binary)
-
-### Fixed
-- Changelog was empty in the About tab (was looking for file on disk instead of embedding)
+- Electron build config (electron-builder, NSIS installer)
+- `node-pty` + `electron-updater` dependencies for Electron mode
+- Electron `main.js`, `preload.js`, and all Node.js backend services
+- `tauri-bridge.js` provides the same `window.api` interface for Tauri builds
 
 ## [0.4.0] - 2026-03-30
 

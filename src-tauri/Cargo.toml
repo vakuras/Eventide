@@ -1,6 +1,6 @@
 [package]
 name = "eventide"
-version = "0.4.1"
+version = "0.5.0"
 description = "Your command center for GitHub Copilot CLI"
 authors = ["vakuras"]
 license = "MIT"
@@ -41,3 +41,4 @@ tempfile = "3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
