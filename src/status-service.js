@@ -295,6 +295,94 @@ class StatusService {
       rl.on('error', () => resolve([]));
     });
   }
+
+  async getSessionDiffs(sessionId) {
+    const sessionDir = path.join(this.sessionStateDir, sessionId);
+    const eventsPath = path.join(sessionDir, 'events.jsonl');
+
+    try {
+      await fs.promises.access(eventsPath);
+    } catch {
+      return [];
+    }
+
+    return new Promise((resolve) => {
+      const fileDiffs = new Map(); // fullPath → { action, diff }
+      const stream = fs.createReadStream(eventsPath, { encoding: 'utf8' });
+      const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+      rl.on('line', (line) => {
+        let event;
+        try { event = JSON.parse(line); } catch { return; }
+        if (event.type !== 'tool.execution_complete') return;
+        const diff = event.data?.result?.detailedContent;
+        if (!diff || !diff.includes('@@') || !diff.includes('diff --git')) return;
+
+        // Check for actual changes
+        const hasChanges = diff.split('\n').some(l => {
+          if (l.startsWith('@@') || l.startsWith('diff ') || l.startsWith('index ') ||
+              l.startsWith('---') || l.startsWith('+++') || l.startsWith('create ') || l.startsWith('new file')) return false;
+          return l.startsWith('+') || l.startsWith('-');
+        });
+        if (!hasChanges) return;
+
+        // Extract file path
+        const plusLine = diff.split('\n').find(l => l.startsWith('+++ b/'));
+        if (!plusLine) return;
+        const fullPath = plusLine.substring(6).replace(/\\/g, '/');
+
+        // Skip internal files
+        if (fullPath.includes('.copilot/session-state/') || fullPath.includes('/AppData/') || fullPath.includes('/Temp/')) return;
+        const lastSegment = fullPath.split('/').pop() || '';
+        if (!lastSegment.includes('.')) return;
+
+        const isCreate = diff.includes('create file mode') || diff.includes('--- a/dev/null');
+        fileDiffs.set(fullPath, { action: isCreate ? 'A' : 'M', diff });
+      });
+
+      rl.on('close', () => {
+        // Find common root prefix
+        const allPaths = [...fileDiffs.keys()];
+        const root = this._findBestRoot(allPaths);
+
+        const result = [];
+        const seen = new Map();
+        for (const [fullPath, { action, diff }] of fileDiffs) {
+          let relPath;
+          if (root && fullPath.toLowerCase().startsWith(root.toLowerCase())) {
+            relPath = fullPath.substring(root.length).replace(/^\//, '');
+          } else if (fullPath.length > 2 && fullPath[1] === ':') {
+            const parts = fullPath.split('/');
+            relPath = parts.slice(-2).join('/');
+          } else {
+            relPath = fullPath.replace(/^\//, '');
+          }
+          const key = relPath.toLowerCase();
+          if (seen.has(key)) {
+            result[seen.get(key)].diff = diff;
+          } else {
+            seen.set(key, result.length);
+            result.push({ path: relPath, fullPath, action, diff });
+          }
+        }
+        resolve(result);
+      });
+      rl.on('error', () => resolve([]));
+    });
+  }
+
+  _findBestRoot(paths) {
+    if (paths.length === 0) return '';
+    const segments = paths.map(p => p.replace(/\\/g, '/').split('/'));
+    let common = [];
+    for (let i = 0; i < segments[0].length; i++) {
+      const seg = segments[0][i].toLowerCase();
+      if (segments.every(s => i < s.length && s[i].toLowerCase() === seg)) {
+        common.push(segments[0][i]);
+      } else break;
+    }
+    return common.length > 0 ? common.join('/') + '/' : '';
+  }
 }
 
 module.exports = StatusService;

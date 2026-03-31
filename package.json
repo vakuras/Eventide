@@ -29,13 +29,14 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "eventide.ico"
+      "icon": "resources/icon.ico"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "Eventide-Electron-Setup-${version}.${ext}",
+      "guid": "com.vakuras.eventide"
     },
     "publish": {
       "provider": "github",

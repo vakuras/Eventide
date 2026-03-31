@@ -138,7 +138,8 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    icon: path.join(__dirname, '..', 'eventide.ico'),
+    show: false,
+    icon: path.join(__dirname, '..', 'resources', 'icon.ico'),
     backgroundColor: bg,
     frame: false,
     webPreferences: {
@@ -154,6 +155,11 @@ function createWindow() {
   mainWindow = new BrowserWindow(winOptions);
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  // Show window only after content is fully loaded
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
 
   // Restore persisted zoom level
   const zoomFactor = settingsService.get().zoomFactor || 1.0;
@@ -494,6 +500,11 @@ app.whenReady().then(async () => {
   // IPC: Get session status (intent, summary, plan, timeline, files)
   ipcMain.handle('session:getStatus', async (event, sessionId) => {
     return statusService.getSessionStatus(sessionId);
+  });
+
+  // IPC: Get session diffs
+  ipcMain.handle('session:getDiffs', async (event, sessionId) => {
+    return statusService.getSessionDiffs(sessionId);
   });
 
   // Forward pty output to renderer — batch at 16ms intervals to prevent IPC flooding

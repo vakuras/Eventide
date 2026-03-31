@@ -34,7 +34,7 @@ const copies = [
   ['src/styles.css', 'styles.css'],
   ['src/tauri-bridge.js', 'tauri-bridge.js'],
   ['node_modules/@xterm/xterm/css/xterm.css', 'xterm.css'],
-  ['eventide.png', 'eventide.png'],
+  ['resources/eventide.png', 'eventide.png'],
 ];
 
 for (const [src, dest] of copies) {
@@ -56,6 +56,7 @@ let html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
 html = html.replace('../node_modules/@xterm/xterm/css/xterm.css', 'xterm.css');
 html = html.replace('"styles.css"', '"styles.css"'); // already flat — no-op
 html = html.replace('../dist/renderer.js', 'renderer.js');
+html = html.replace('../resources/eventide.png', 'eventide.png');
 
 // Inject Tauri bridge script before renderer
 html = html.replace(

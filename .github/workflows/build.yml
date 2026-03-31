@@ -50,6 +50,19 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
+      - name: Rename Tauri installer
+        shell: pwsh
+        run: |
+          $nsisDir = "src-tauri/target/release/bundle/nsis"
+          Get-ChildItem "$nsisDir/*.exe" | ForEach-Object {
+            $newName = $_.Name -replace '^Eventide_', 'Eventide-Tauri-Setup-'
+            $newName = $newName -replace '_x64-setup\.exe$', '.exe'
+            if ($newName -ne $_.Name) {
+              Rename-Item $_.FullName $newName
+              Write-Host "Renamed $($_.Name) -> $newName"
+            }
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist-Windows

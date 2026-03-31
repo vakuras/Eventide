@@ -186,8 +186,10 @@ window.api = {
   closeWindow: () => invoke('plugin:window|close', { label: 'main' }),
 };
 
-// Wire window control buttons
+// Wire window control buttons and show them (Tauri uses custom controls, not native overlay)
 const wireWindowControls = () => {
+  const controls = document.getElementById('titlebar-window-controls');
+  if (controls) controls.style.display = '';
   const btnMin = document.getElementById('btn-minimize');
   const btnMax = document.getElementById('btn-maximize');
   const btnClose = document.getElementById('btn-close');

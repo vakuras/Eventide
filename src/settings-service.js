@@ -17,6 +17,7 @@ const DEFAULTS = {
   defaultWorkdir: '', // default working directory for new sessions; empty = user home
   autoUpdateEnabled: true, // false = no update checks or downloads
   statusPanelSections: {}, // persisted expand/collapse state for status panel sections
+  diffPanelWidth: 500, // width of the diff panel in pixels
 };
 
 class SettingsService {

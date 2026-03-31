@@ -13,10 +13,14 @@
   <div id="titlebar">
     <span class="titlebar-text" id="titlebar-home" title="Home">Eventide</span>
     <div class="titlebar-actions">
-      <button id="btn-feedback" title="Feedback">✎</button>
       <button id="btn-notifications" title="Alerts">⚐<span id="notification-badge" class="notification-badge hidden">0</span></button>
       <button id="btn-instructions" title="Instructions">☰</button>
       <button id="btn-settings" title="Settings">⚙</button>
+    </div>
+    <div class="titlebar-window-controls" id="titlebar-window-controls" style="display:none">
+      <button id="btn-minimize" class="window-control" title="Minimize">&#xE921;</button>
+      <button id="btn-maximize" class="window-control" title="Maximize">&#xE922;</button>
+      <button id="btn-close" class="window-control window-control-close" title="Close">&#xE8BB;</button>
     </div>
   </div>
 
@@ -55,6 +59,7 @@
           <div class="tabs-scroll-area">
           </div>
           <button class="tab-scroll-btn tab-scroll-right" title="Scroll right">▶</button>
+          <button id="btn-toggle-diff" title="Diff View (Ctrl+D)">±</button>
           <button id="btn-toggle-status" title="Session Status (Ctrl+I)">☷</button>
         </div>
           <div id="terminal-main-row">
@@ -70,9 +75,8 @@
                   </div>
                 </div>
                 <div id="empty-state">
-                  <div class="empty-icon">Eventide</div>
+                  <img src="../resources/eventide.png" alt="Eventide" class="empty-icon-img">
                   <p>No sessions yet. Start a new one to get going.</p>
-                  <button id="btn-new-center" title="New Session (Ctrl+N)">+ New Session</button>
                 </div>
               </div>
               <div id="terminal-prompt-ghost" class="terminal-prompt-ghost" aria-hidden="true"></div>
@@ -87,6 +91,23 @@
             <div id="status-panel-body">
               <div class="status-empty">Open a session to see its status</div>
             </div>
+          </div>
+          <!-- Diff panel (right sidebar, collapsible) -->
+          <div id="diff-panel" class="collapsed">
+            <div id="diff-panel-header">
+              <h3>Diff View</h3>
+              <div id="diff-panel-controls">
+                <button id="diff-view-toggle" class="diff-toggle-btn" title="Toggle unified/split view">Split</button>
+                <button class="diff-panel-close" title="Close">×</button>
+              </div>
+            </div>
+            <div id="diff-panel-content">
+              <div id="diff-file-list"></div>
+              <div id="diff-view-area">
+                <div class="diff-empty">Select a file to view changes</div>
+              </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>
@@ -117,7 +138,6 @@
       </div>
       <div class="settings-tabs">
         <button class="settings-tab active" data-settings-tab="general">General</button>
-        <button class="settings-tab" data-settings-tab="updates">Updates</button>
         <button class="settings-tab" data-settings-tab="shortcuts">Shortcuts</button>
         <button class="settings-tab" data-settings-tab="about">About</button>
       </div>
@@ -164,7 +184,11 @@
           <div class="settings-group">
             <label class="settings-label">Appearance</label>
             <div class="theme-switcher">
-              <button class="theme-option active" data-theme="mocha">
+              <button class="theme-option" data-theme="midnight">
+                <div class="theme-preview midnight"></div>
+                Midnight
+              </button>
+              <button class="theme-option" data-theme="mocha">
                 <div class="theme-preview dark"></div>
                 Mocha
               </button>
@@ -172,52 +196,10 @@
                 <div class="theme-preview light"></div>
                 Latte
               </button>
-              <button class="theme-option" data-theme="midnight">
-                <div class="theme-preview midnight"></div>
-                Midnight
-              </button>
               <button class="theme-option" data-theme="retro">
                 <div class="theme-preview retro"></div>
                 Retro
               </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Updates tab -->
-        <div class="settings-tab-panel" data-settings-panel="updates">
-          <div class="settings-group">
-            <label class="settings-label">Auto-Update</label>
-            <div class="settings-row">
-              <div class="settings-row-text">
-                <span class="settings-row-title">Enable auto-update</span>
-                <span class="settings-row-desc">Automatically check for and install updates</span>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="auto-update-enabled">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div class="settings-row" id="beta-channel-row">
-              <div class="settings-row-text">
-                <span class="settings-row-title">Early adapter</span>
-                <span class="settings-row-desc">Get early-access builds before general release (may be less stable)</span>
-              </div>
-              <label class="toggle-switch" id="beta-channel-label">
-                <input type="checkbox" id="beta-channel">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-          </div>
-
-          <div class="settings-group">
-            <label class="settings-label">Status</label>
-            <div id="about-version" class="about-version"></div>
-            <div id="update-section" class="update-section">
-              <div id="update-status" class="update-status hidden"></div>
-              <div id="update-progress" class="update-progress hidden">
-                <div id="update-progress-bar" class="update-progress-bar"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -232,6 +214,7 @@
               <div class="shortcut-row"><span class="shortcut-action">Next tab</span><kbd>Ctrl+Tab</kbd></div>
               <div class="shortcut-row"><span class="shortcut-action">Previous tab</span><kbd>Ctrl+Shift+Tab</kbd></div>
               <div class="shortcut-row"><span class="shortcut-action">Toggle status panel</span><kbd>Ctrl+I</kbd></div>
+              <div class="shortcut-row"><span class="shortcut-action">Toggle diff panel</span><kbd>Ctrl+D</kbd></div>
               <div class="shortcut-row"><span class="shortcut-action">Search in terminal</span><kbd>Ctrl+F</kbd></div>
               <div class="shortcut-row"><span class="shortcut-action">Copy (with selection)</span><kbd>Ctrl+C</kbd></div>
               <div class="shortcut-row"><span class="shortcut-action">Paste</span><kbd>Ctrl+V</kbd></div>
@@ -250,6 +233,28 @@
           <div class="settings-group">
             <div id="about-version-tab" class="about-version"></div>
           </div>
+
+          <div class="settings-group">
+            <label class="settings-label">Updates</label>
+            <div class="settings-row">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Enable auto-update</span>
+                <span class="settings-row-desc">Automatically check for and install updates</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="auto-update-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div id="about-version" class="about-version" style="display:none"></div>
+            <div id="update-section" class="update-section">
+              <div id="update-status" class="update-status hidden"></div>
+              <div id="update-progress" class="update-progress hidden">
+                <div id="update-progress-bar" class="update-progress-bar"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-group">
             <label class="settings-label">Changelog</label>
             <div id="about-changelog" class="about-changelog"></div>
@@ -257,30 +262,6 @@
         </div>
 
       </div>
-    </div>
-  </div>
-
-  <!-- Feedback dropdown -->
-  <div id="feedback-panel" class="feedback-panel hidden">
-    <div class="feedback-panel-header">
-      <span>Feedback</span>
-      <button id="btn-close-feedback" class="notification-panel-actions btn-icon">×</button>
-    </div>
-    <div class="feedback-panel-body">
-      <button id="btn-report-bug" class="feedback-action">
-        <span class="feedback-action-icon">🐛</span>
-        <div class="feedback-action-text">
-          <div class="feedback-action-title">Report a Bug</div>
-          <div class="feedback-action-desc">Something isn't working as expected</div>
-        </div>
-      </button>
-      <button id="btn-request-feature" class="feedback-action">
-        <span class="feedback-action-icon">💡</span>
-        <div class="feedback-action-text">
-          <div class="feedback-action-title">Request a Feature</div>
-          <div class="feedback-action-desc">Suggest an idea or improvement</div>
-        </div>
-      </button>
     </div>
   </div>
 

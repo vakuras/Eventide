@@ -30,6 +30,10 @@ let sidebarSearchRequestSeq = 0;
 let sidebarCollapsed = false;
 let sidebarHidden = false;
 let lastExpandedSidebarWidth = 280;
+let lastDiffPanelWidth = 500;
+let diffViewMode = 'unified';
+let currentDiffData = null;
+let currentDiffFile = null;
 const sessionPromptGhostState = new Map();
 
 const SIDEBAR_MIN_WIDTH = 200;
@@ -111,7 +115,6 @@ const tabScrollLeft = terminalTabs.querySelector('.tab-scroll-left');
 const tabScrollRight = terminalTabs.querySelector('.tab-scroll-right');
 const emptyState = document.getElementById('empty-state');
 const btnNew = document.getElementById('btn-new');
-const btnNewCenter = document.getElementById('btn-new-center');
 const maxConcurrentInput = document.getElementById('max-concurrent');
 const promptWorkdirInput = document.getElementById('prompt-workdir');
 const defaultWorkdirInput = document.getElementById('default-workdir');
@@ -127,15 +130,16 @@ const btnSettings = document.getElementById('btn-settings');
 const statusPanel = document.getElementById('status-panel');
 const statusPanelBody = document.getElementById('status-panel-body');
 const btnToggleStatus = document.getElementById('btn-toggle-status');
+const diffPanel = document.getElementById('diff-panel');
+const diffFileList = document.getElementById('diff-file-list');
+const diffViewArea = document.getElementById('diff-view-area');
+const btnToggleDiff = document.getElementById('btn-toggle-diff');
+const diffViewToggle = document.getElementById('diff-view-toggle');
 const notificationBadge = document.getElementById('notification-badge');
 const notificationPanel = document.getElementById('notification-panel');
 const notificationListEl = document.getElementById('notification-list');
-const feedbackPanel = document.getElementById('feedback-panel');
 const toastContainer = document.getElementById('toast-container');
 const autoUpdateToggle = document.getElementById('auto-update-enabled');
-const betaChannelToggle = document.getElementById('beta-channel');
-const betaChannelLabel = document.getElementById('beta-channel-label');
-const betaChannelRow = document.getElementById('beta-channel-row');
 
 const titlebar = document.getElementById('titlebar');
 const NOTIF_ICONS = { 'task-done': '✓', 'needs-input': '◌', 'error': '!', 'info': '·' };
@@ -573,14 +577,13 @@ async function init() {
   promptWorkdirInput.checked = !!settings.promptForWorkdir;
   defaultWorkdirInput.value = settings.defaultWorkdir || '';
   autoUpdateToggle.checked = settings.autoUpdateEnabled !== false;
-  betaChannelToggle.checked = settings.updateChannel === 'beta';
-  betaChannelRow.classList.toggle('disabled', !autoUpdateToggle.checked);
-  betaChannelToggle.disabled = !autoUpdateToggle.checked;
   lastExpandedSidebarWidth = settings.sidebarWidth || 280;
+  lastDiffPanelWidth = settings.diffPanelWidth || 500;
   sidebarHidden = !!settings.sidebarCollapsed;
   sidebarCollapsed = false;
   syncSidebarCollapsedUi();
-  applyTheme(settings.theme || 'mocha');
+  applyTheme(settings.theme || 'midnight');
+  updatePanelButtonState();
 
   // Restore last sidebar tab — must be set BEFORE refreshSessionList
   if (settings.lastActiveTab) {
@@ -630,10 +633,11 @@ async function init() {
           updateTabScrollButtons();
           if (activeSessionId === sessionId) {
             activeSessionId = null;
+            updatePanelButtonState();
             updateSessionPromptGhost(null);
             const remaining = document.querySelectorAll('.tab');
             if (remaining.length > 0) switchToSession(remaining[remaining.length - 1].dataset.sessionId);
-            else { emptyState.classList.remove('hidden'); updateStatusPanel(null); }
+            else { emptyState.classList.remove('hidden'); updateStatusPanel(null); updateDiffPanel(null); }
           }
           saveTabState();
           scheduleRenderSessionList();
@@ -666,10 +670,11 @@ async function init() {
     updateTabScrollButtons();
     if (activeSessionId === sessionId) {
       activeSessionId = null;
+      updatePanelButtonState();
       updateSessionPromptGhost(null);
       const remaining = document.querySelectorAll('.tab');
       if (remaining.length > 0) switchToSession(remaining[remaining.length - 1].dataset.sessionId);
-      else { emptyState.classList.remove('hidden'); updateStatusPanel(null); }
+      else { emptyState.classList.remove('hidden'); updateStatusPanel(null); updateDiffPanel(null); }
     }
     renderSessionList();
     saveTabState();
@@ -730,6 +735,28 @@ async function init() {
     btnToggleStatus.classList.remove('active');
     fitActiveTerminal();
   });
+
+  // Diff panel
+  btnToggleDiff.addEventListener('click', toggleDiffPanel);
+  diffPanel.querySelector('.diff-panel-close').addEventListener('click', () => {
+    diffPanel.classList.add('collapsed');
+    diffPanel.style.width = '';
+    btnToggleDiff.classList.remove('active');
+    let fitted = false;
+    diffPanel.addEventListener('transitionend', function onEnd(e) {
+      if (e.propertyName === 'width') { diffPanel.removeEventListener('transitionend', onEnd); fitted = true; fitActiveTerminal(); }
+    });
+    setTimeout(() => { if (!fitted) fitActiveTerminal(); }, 350);
+  });
+  diffViewToggle.addEventListener('click', () => {
+    diffViewMode = diffViewMode === 'unified' ? 'split' : 'unified';
+    diffViewToggle.textContent = diffViewMode === 'unified' ? 'Split' : 'Unified';
+    if (currentDiffFile && currentDiffData) {
+      const file = currentDiffData.find(f => f.path === currentDiffFile);
+      if (file) renderDiffContent(file);
+    }
+  });
+
   statusPanelBody.addEventListener('click', async (event) => {
     const copyButton = event.target.closest('.status-copy-session-id');
     if (!copyButton) return;
@@ -769,18 +796,7 @@ async function init() {
         !e.target.closest('#btn-notifications')) {
       notificationPanel.classList.add('hidden');
     }
-    if (!feedbackPanel.classList.contains('hidden') &&
-        !feedbackPanel.contains(e.target) &&
-        !e.target.closest('#btn-feedback')) {
-      feedbackPanel.classList.add('hidden');
-    }
   });
-
-  // Feedback
-  document.getElementById('btn-feedback').addEventListener('click', toggleFeedbackPanel);
-  document.getElementById('btn-close-feedback').addEventListener('click', () => feedbackPanel.classList.add('hidden'));
-  document.getElementById('btn-report-bug').addEventListener('click', () => openFeedbackIssue('bug'));
-  document.getElementById('btn-request-feature').addEventListener('click', () => openFeedbackIssue('feature'));
 
   ipcCleanups.push(window.api.onNotification((notification) => {
     showToast(notification);
@@ -860,9 +876,10 @@ settingsOverlay.querySelectorAll('.settings-tab').forEach(tab => {
 async function populateAboutSection() {
   const version = await window.api.getVersion();
   const changelog = await window.api.getChangelog();
+  const flavor = window.__TAURI__ ? 'Tauri' : 'Electron';
   document.getElementById('about-version').textContent = `v${version}`;
   const aboutVersionTab = document.getElementById('about-version-tab');
-  if (aboutVersionTab) aboutVersionTab.textContent = `Eventide v${version}`;
+  if (aboutVersionTab) aboutVersionTab.textContent = `Eventide (${flavor}) v${version}`;
   const changelogEl = document.getElementById('about-changelog');
   changelogEl.textContent = changelog || 'No changelog available.';
 
@@ -1581,6 +1598,7 @@ function switchToSession(sessionId) {
   }
 
   activeSessionId = sessionId;
+  updatePanelButtonState();
   sessionLastUsed.set(sessionId, Date.now());
 
   // Ensure sidebar shows the active tab when switching to a session
@@ -1616,6 +1634,7 @@ function switchToSession(sessionId) {
   if (activeTab) activeTab.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
 
   updateStatusPanel(sessionId);
+  updateDiffPanel(sessionId);
   patchActiveHighlight();
   patchSessionStateBadges();
   saveTabState();
@@ -1635,10 +1654,12 @@ function showHome() {
   }
   closeSessionSearch({ restoreTerminalFocus: false });
   activeSessionId = null;
+  updatePanelButtonState();
   updateSessionPromptGhost(null);
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   emptyState.classList.remove('hidden');
   updateStatusPanel(null);
+  updateDiffPanel(null);
 }
 
 function addTab(sessionId, title) {
@@ -1729,6 +1750,7 @@ async function closeTab(sessionId) {
 
   if (activeSessionId === sessionId) {
     activeSessionId = null;
+    updatePanelButtonState();
     updateSessionPromptGhost(null);
     const remainingTabs = document.querySelectorAll('.tab');
     if (remainingTabs.length > 0) {
@@ -1737,6 +1759,7 @@ async function closeTab(sessionId) {
       closeSessionSearch({ restoreTerminalFocus: false });
       emptyState.classList.remove('hidden');
       updateStatusPanel(null);
+      updateDiffPanel(null);
     }
   }
 
@@ -2106,10 +2129,36 @@ function removeTabFromGroupSilent(sessionId) {
 }
 
 // Status panel
+function updatePanelButtonState() {
+  const hasSession = !!activeSessionId;
+  btnToggleStatus.disabled = !hasSession;
+  btnToggleDiff.disabled = !hasSession;
+  btnToggleStatus.style.opacity = hasSession ? '' : '0.3';
+  btnToggleDiff.style.opacity = hasSession ? '' : '0.3';
+  if (!hasSession) {
+    // Close panels when no session
+    if (!statusPanel.classList.contains('collapsed')) {
+      statusPanel.classList.add('collapsed');
+      btnToggleStatus.classList.remove('active');
+    }
+    if (!diffPanel.classList.contains('collapsed')) {
+      diffPanel.classList.add('collapsed');
+      diffPanel.style.width = '';
+      btnToggleDiff.classList.remove('active');
+    }
+  }
+}
+
 function toggleStatusPanel() {
   const collapsed = statusPanel.classList.toggle('collapsed');
   btnToggleStatus.classList.toggle('active', !collapsed);
   if (!collapsed && activeSessionId) updateStatusPanel(activeSessionId);
+  // Close diff panel if opening status
+  if (!collapsed && !diffPanel.classList.contains('collapsed')) {
+    diffPanel.classList.add('collapsed');
+    diffPanel.style.width = '';
+    btnToggleDiff.classList.remove('active');
+  }
   // Refit terminal once the CSS width transition actually finishes
   let fitted = false;
   statusPanel.addEventListener('transitionend', function onEnd(e) {
@@ -2369,6 +2418,205 @@ async function updateStatusPanel(sessionId) {
     });
   });
 }
+
+function toggleDiffPanel() {
+  const collapsed = diffPanel.classList.toggle('collapsed');
+  btnToggleDiff.classList.toggle('active', !collapsed);
+  if (!collapsed) {
+    diffPanel.style.width = lastDiffPanelWidth + 'px';
+    if (activeSessionId) updateDiffPanel(activeSessionId);
+  } else {
+    diffPanel.style.width = '';
+  }
+  if (!collapsed && !statusPanel.classList.contains('collapsed')) {
+    statusPanel.classList.add('collapsed');
+    btnToggleStatus.classList.remove('active');
+  }
+  let fitted = false;
+  diffPanel.addEventListener('transitionend', function onEnd(e) {
+    if (e.propertyName === 'width') {
+      diffPanel.removeEventListener('transitionend', onEnd);
+      fitted = true;
+      fitActiveTerminal();
+    }
+  });
+  setTimeout(() => { if (!fitted) fitActiveTerminal(); }, 350);
+}
+
+async function updateDiffPanel(sessionId) {
+  if (diffPanel.classList.contains('collapsed')) return;
+  if (!sessionId) {
+    diffFileList.innerHTML = '';
+    diffViewArea.innerHTML = '<div class="diff-empty">Open a session to view diffs</div>';
+    currentDiffData = null;
+    return;
+  }
+
+  try {
+    const diffs = await window.api.getSessionDiffs(sessionId);
+    currentDiffData = diffs;
+
+    if (!diffs || diffs.length === 0) {
+      diffFileList.innerHTML = '<div class="diff-empty">No file changes</div>';
+      diffViewArea.innerHTML = '<div class="diff-empty">No diffs available</div>';
+      currentDiffFile = null;
+      return;
+    }
+
+    const groups = new Map();
+    for (const f of diffs) {
+      const firstSlash = f.path.indexOf('/');
+      const dir = firstSlash > 0 ? f.path.substring(0, firstSlash) : '';
+      const fileName = firstSlash > 0 ? f.path.substring(firstSlash + 1) : f.path;
+      if (!groups.has(dir)) groups.set(dir, []);
+      groups.get(dir).push({ ...f, fileName });
+    }
+
+    let listHtml = '';
+    for (const [dir, files] of groups) {
+      if (dir) {
+        listHtml += `<div class="diff-dir-header" title="${escapeHtml(dir)}">${escapeHtml(dir)}</div>`;
+      }
+      for (const f of files) {
+        const badgeCls = f.action === 'A' || f.action === 'added' ? 'added' : 'modified';
+        const badge = f.action.length === 1 ? f.action : f.action.charAt(0).toUpperCase();
+        listHtml += `<div class="diff-file-entry" data-path="${escapeHtml(f.path)}">
+          <span class="diff-file-badge ${badgeCls}">${badge}</span>
+          <span class="diff-file-name" title="${escapeHtml(f.path)}">${escapeHtml(f.fileName)}</span>
+        </div>`;
+      }
+    }
+    diffFileList.innerHTML = listHtml;
+
+    diffFileList.querySelectorAll('.diff-file-entry').forEach(entry => {
+      entry.addEventListener('click', () => {
+        diffFileList.querySelectorAll('.diff-file-entry').forEach(e => e.classList.remove('active'));
+        entry.classList.add('active');
+        const filePath = entry.dataset.path;
+        currentDiffFile = filePath;
+        const file = diffs.find(f => f.path === filePath);
+        if (file) renderDiffContent(file);
+      });
+    });
+
+    const firstEntry = diffFileList.querySelector('.diff-file-entry');
+    if (firstEntry) firstEntry.click();
+  } catch {
+    diffViewArea.innerHTML = '<div class="diff-empty">Failed to load diffs</div>';
+  }
+}
+
+function parseDiffLines(diffText) {
+  const lines = diffText.split('\n');
+  const result = [];
+  let oldLine = 0, newLine = 0;
+
+  for (const line of lines) {
+    if (line.startsWith('diff --git') || line.startsWith('index ') ||
+        line.startsWith('---') || line.startsWith('+++') ||
+        line.startsWith('create file') || line.startsWith('new file')) continue;
+
+    if (line.startsWith('@@')) {
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLine = parseInt(match[1]);
+        newLine = parseInt(match[2]);
+      }
+      result.push({ type: 'hunk', text: line });
+    } else if (line.startsWith('+')) {
+      result.push({ type: 'add', oldNum: null, newNum: newLine++, text: line.substring(1) });
+    } else if (line.startsWith('-')) {
+      result.push({ type: 'del', oldNum: oldLine++, newNum: null, text: line.substring(1) });
+    } else if (line.startsWith(' ') || line === '') {
+      result.push({ type: 'ctx', oldNum: oldLine++, newNum: newLine++, text: line.substring(1) || '' });
+    }
+  }
+  return result;
+}
+
+function renderDiffContent(file) {
+  const parsed = parseDiffLines(file.diff);
+  if (parsed.length === 0) {
+    diffViewArea.innerHTML = '<div class="diff-empty">No diff content</div>';
+    return;
+  }
+
+  const header = `<div class="diff-file-header">${escapeHtml(file.path)}</div>`;
+
+  if (diffViewMode === 'unified') {
+    const linesHtml = parsed.map(l => {
+      if (l.type === 'hunk') return `<div class="diff-hunk-header">${escapeHtml(l.text)}</div>`;
+      const cls = l.type === 'add' ? 'add' : l.type === 'del' ? 'del' : 'ctx';
+      const prefix = l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' ';
+      const oldNum = l.oldNum != null ? l.oldNum : '';
+      const newNum = l.newNum != null ? l.newNum : '';
+      return `<div class="diff-line ${cls}"><span class="diff-line-num">${oldNum}</span><span class="diff-line-num">${newNum}</span><span class="diff-line-content">${prefix}${escapeHtml(l.text)}</span></div>`;
+    }).join('');
+    diffViewArea.innerHTML = header + linesHtml;
+  } else {
+    const leftLines = [];
+    const rightLines = [];
+    let i = 0;
+    while (i < parsed.length) {
+      const l = parsed[i];
+      if (l.type === 'hunk') {
+        leftLines.push({ type: 'hunk', text: l.text });
+        rightLines.push({ type: 'hunk', text: l.text });
+        i++;
+      } else if (l.type === 'ctx') {
+        leftLines.push(l);
+        rightLines.push(l);
+        i++;
+      } else if (l.type === 'del') {
+        const dels = [];
+        while (i < parsed.length && parsed[i].type === 'del') { dels.push(parsed[i]); i++; }
+        const adds = [];
+        while (i < parsed.length && parsed[i].type === 'add') { adds.push(parsed[i]); i++; }
+        const maxLen = Math.max(dels.length, adds.length);
+        for (let j = 0; j < maxLen; j++) {
+          leftLines.push(j < dels.length ? dels[j] : { type: 'empty', text: '' });
+          rightLines.push(j < adds.length ? adds[j] : { type: 'empty', text: '' });
+        }
+      } else if (l.type === 'add') {
+        leftLines.push({ type: 'empty', text: '' });
+        rightLines.push(l);
+        i++;
+      } else {
+        i++;
+      }
+    }
+
+    const renderSide = (lines, isLeft) => lines.map(l => {
+      if (l.type === 'hunk') return `<div class="diff-hunk-header">${escapeHtml(l.text)}</div>`;
+      const cls = l.type === 'add' ? 'add' : l.type === 'del' ? 'del' : 'ctx';
+      const num = isLeft ? (l.oldNum != null ? l.oldNum : '') : (l.newNum != null ? l.newNum : '');
+      return `<div class="diff-line ${cls}"><span class="diff-line-num">${num}</span><span class="diff-line-content">${escapeHtml(l.text)}</span></div>`;
+    }).join('');
+
+    diffViewArea.innerHTML = header + `<div class="diff-split-container"><div class="diff-split-side">${renderSide(leftLines, true)}</div><div class="diff-split-side">${renderSide(rightLines, false)}</div></div>`;
+  }
+}
+
+// Diff panel resize
+let isDiffResizing = false;
+diffPanel.addEventListener('mousedown', (e) => {
+  if (diffPanel.classList.contains('collapsed')) return;
+  const rect = diffPanel.getBoundingClientRect();
+  if (e.clientX - rect.left > 12) return;
+  isDiffResizing = true;
+  diffPanel.classList.add('resizing');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+});
+diffPanel.addEventListener('mousemove', (e) => {
+  if (isDiffResizing) return;
+  const rect = diffPanel.getBoundingClientRect();
+  diffPanel.classList.toggle('resize-hover', e.clientX - rect.left <= 12);
+});
+diffPanel.addEventListener('mouseleave', () => {
+  if (!isDiffResizing) diffPanel.classList.remove('resize-hover');
+});
 
 function fitActiveTerminal() {
   if (activeSessionId && terminals.has(activeSessionId)) {
@@ -2713,6 +2961,11 @@ resizeHandle.addEventListener('mousedown', (e) => {
 });
 
 document.addEventListener('mousemove', (e) => {
+  if (isDiffResizing) {
+    const newWidth = Math.max(300, Math.min(window.innerWidth * 0.7, window.innerWidth - e.clientX));
+    diffPanel.style.width = newWidth + 'px';
+    lastDiffPanelWidth = newWidth;
+  }
   if (!isResizing) return;
   if (!resizeDidDrag && Math.abs(e.clientX - resizeStartX) > 3) resizeDidDrag = true;
   if (!resizeDidDrag) return;
@@ -2741,6 +2994,14 @@ document.addEventListener('mousemove', (e) => {
 });
 
 document.addEventListener('mouseup', () => {
+  if (isDiffResizing) {
+    isDiffResizing = false;
+    diffPanel.classList.remove('resizing');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    window.api.updateSettings({ diffPanelWidth: lastDiffPanelWidth });
+    fitActiveTerminal();
+  }
   if (isResizing) {
     isResizing = false;
     resizeHandle.classList.remove('dragging');
@@ -2811,7 +3072,6 @@ sessionSearchPrev.addEventListener('click', () => stepSessionSearch(-1));
 sessionSearchNext.addEventListener('click', () => stepSessionSearch(1));
 sessionSearchClose.addEventListener('click', () => closeSessionSearch());
 btnNew.addEventListener('click', newSession);
-btnNewCenter.addEventListener('click', newSession);
 
 maxConcurrentInput.addEventListener('change', (e) => {
   const val = parseInt(e.target.value, 10);
@@ -2838,13 +3098,6 @@ btnClearDefaultWorkdir.addEventListener('click', () => {
 
 autoUpdateToggle.addEventListener('change', (e) => {
   window.api.updateSettings({ autoUpdateEnabled: e.target.checked });
-  betaChannelRow.classList.toggle('disabled', !e.target.checked);
-  betaChannelToggle.disabled = !e.target.checked;
-  window.api.applyUpdateSettings();
-});
-
-betaChannelToggle.addEventListener('change', (e) => {
-  window.api.updateSettings({ updateChannel: e.target.checked ? 'beta' : 'stable' });
   window.api.applyUpdateSettings();
 });
 
@@ -2852,42 +3105,9 @@ betaChannelToggle.addEventListener('change', (e) => {
 async function toggleNotificationPanel() {
   const wasHidden = notificationPanel.classList.contains('hidden');
   notificationPanel.classList.toggle('hidden');
-  feedbackPanel.classList.add('hidden');
   if (wasHidden) {
     await window.api.markAllNotificationsRead();
     await refreshNotifications();
-  }
-}
-
-function toggleFeedbackPanel() {
-  notificationPanel.classList.add('hidden');
-  feedbackPanel.classList.toggle('hidden');
-}
-
-async function openFeedbackIssue(type) {
-  feedbackPanel.classList.add('hidden');
-  const version = await window.api.getVersion();
-  const repoBase = 'https://github.com/vakuras/Eventide/issues/new';
-
-  if (type === 'bug') {
-    const title = encodeURIComponent('[Bug] ');
-    const body = encodeURIComponent(
-      `**Eventide Version:** v${version}\n\n` +
-      `**Describe the bug:**\n<!-- A clear description of what the bug is. -->\n\n` +
-      `**Steps to reproduce:**\n1. \n2. \n3. \n\n` +
-      `**Expected behavior:**\n\n` +
-      `**Actual behavior:**\n`
-    );
-    window.api.openExternal(`${repoBase}?labels=bug&title=${title}&body=${body}`);
-  } else {
-    const title = encodeURIComponent('[Feature] ');
-    const body = encodeURIComponent(
-      `**Eventide Version:** v${version}\n\n` +
-      `**Feature Request:**\n<!-- A clear description of the feature you'd like. -->\n\n` +
-      `**Problem it solves:**\n\n` +
-      `**Proposed solution:**\n`
-    );
-    window.api.openExternal(`${repoBase}?labels=enhancement&title=${title}&body=${body}`);
   }
 }
 
@@ -3054,6 +3274,12 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.key === 'i') {
     e.preventDefault();
     toggleStatusPanel();
+  }
+
+  // Ctrl/Cmd+D: Toggle diff panel
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    e.preventDefault();
+    toggleDiffPanel();
   }
 
   // Ctrl/Cmd+F: Open in-session search when a session is active
