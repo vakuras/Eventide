@@ -32,12 +32,18 @@ jobs:
 
       - run: npm ci
 
-      - name: Build frontend
+      - name: Build Electron frontend
         run: npm run build
+
+      - name: Build Tauri frontend
+        run: npm run tauri:frontend
 
       - name: Run Rust tests
         run: cargo test
         working-directory: src-tauri
+
+      - name: Build Electron installer
+        run: npm run dist
 
       - name: Build Tauri app
         run: npx tauri build
@@ -48,6 +54,7 @@ jobs:
         with:
           name: dist-Windows
           path: |
+            release/*.exe
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/nsis/*.nsis.zip
             src-tauri/target/release/bundle/nsis/*.sig

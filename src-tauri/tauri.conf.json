@@ -5,8 +5,8 @@
   "identifier": "com.eventide.desktop",
   "build": {
     "frontendDist": "../dist-tauri",
-    "beforeDevCommand": "npm run build",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm run tauri:frontend",
+    "beforeBuildCommand": "npm run tauri:frontend"
   },
   "app": {
     "windows": [
