@@ -43,7 +43,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Build Electron installer
-        run: npm run dist
+        run: npx electron-builder --win --publish never
 
       - name: Build Tauri app
         run: npx tauri build
