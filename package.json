@@ -31,11 +31,6 @@
       "target": "nsis",
       "icon": "eventide.ico"
     },
-    "mac": {
-      "target": ["dmg", "zip"],
-      "icon": "eventide.png",
-      "category": "public.app-category.developertools"
-    },
     "nsis": {
       "oneClick": true,
       "perMachine": false,

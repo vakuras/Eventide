@@ -14,31 +14,7 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            electron_args: --win
-            electron_artifacts: release/*.exe
-            tauri_artifacts: |
-              src-tauri/target/release/bundle/nsis/*.exe
-              src-tauri/target/release/bundle/nsis/*.nsis.zip
-              src-tauri/target/release/bundle/nsis/*.sig
-            artifact_name: dist-Windows
-
-          - os: macos-latest
-            electron_args: --mac
-            electron_artifacts: |
-              release/*.dmg
-              release/*.zip
-            tauri_artifacts: |
-              src-tauri/target/release/bundle/dmg/*.dmg
-              src-tauri/target/release/bundle/macos/*.app.tar.gz
-              src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
-            artifact_name: dist-macOS
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -56,10 +32,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Generate macOS icons
-        if: runner.os == 'macOS'
-        run: npx tauri icon eventide.png
-
       - name: Build Electron frontend
         run: npm run build
 
@@ -71,7 +43,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Build Electron installer
-        run: npx electron-builder ${{ matrix.electron_args }} --publish never
+        run: npx electron-builder --win --publish never
 
       - name: Build Tauri app
         run: npx tauri build
@@ -80,14 +52,12 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.electron_artifacts }}
-          if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}-tauri
-          path: ${{ matrix.tauri_artifacts }}
+          name: dist-Windows
+          path: |
+            release/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/release/bundle/nsis/*.sig
           if-no-files-found: warn
 
   release:
