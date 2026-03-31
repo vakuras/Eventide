@@ -5,3 +5,4 @@ pub mod status;
 pub mod notifications;
 pub mod instructions;
 pub mod app;
+pub mod resource;

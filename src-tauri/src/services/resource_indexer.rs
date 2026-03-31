@@ -286,4 +286,140 @@ impl ResourceIndexer {
 
         merged
     }
+
+    /// Parse a URL string into a typed Resource.
+    fn parse_url_to_resource(url: &str) -> Option<Resource> {
+        let url = url.trim();
+        if url.is_empty() { return None; }
+
+        if url.contains("/pullrequest/") {
+            let pr_re = Regex::new(r"/pullrequest/(\d+)").ok()?;
+            let id = pr_re.captures(url)?.get(1)?.as_str().to_string();
+            let repo = Regex::new(r"_git/([^/]+)/pullrequest").ok()
+                .and_then(|re| re.captures(url))
+                .map(|c| c[1].to_string());
+            return Some(Resource {
+                resource_type: "pr".to_string(),
+                id: Some(id), url: Some(url.to_string()),
+                repo, name: None, state: None,
+            });
+        }
+        if url.contains("/_workitems/edit/") {
+            let re = Regex::new(r"/_workitems/edit/(\d+)").ok()?;
+            let id = re.captures(url)?.get(1)?.as_str().to_string();
+            return Some(Resource {
+                resource_type: "workitem".to_string(),
+                id: Some(id), url: Some(url.to_string()),
+                name: None, repo: None, state: None,
+            });
+        }
+        if url.contains("/_build/results?buildId=") {
+            let re = Regex::new(r"buildId=(\d+)").ok()?;
+            let id = re.captures(url)?.get(1)?.as_str().to_string();
+            return Some(Resource {
+                resource_type: "pipeline".to_string(),
+                id: Some(id), url: Some(url.to_string()),
+                name: None, repo: None, state: None,
+            });
+        }
+        if url.contains("/_build?definitionId=") {
+            let re = Regex::new(r"definitionId=(\d+)").ok()?;
+            let def_id = format!("def-{}", re.captures(url)?.get(1)?.as_str());
+            return Some(Resource {
+                resource_type: "pipeline".to_string(),
+                id: Some(def_id), url: Some(url.to_string()),
+                name: None, repo: None, state: None,
+            });
+        }
+        if url.contains("releaseId=") {
+            let re = Regex::new(r"releaseId=(\d+)").ok()?;
+            let id = re.captures(url)?.get(1)?.as_str().to_string();
+            return Some(Resource {
+                resource_type: "release".to_string(),
+                id: Some(id), url: Some(url.to_string()),
+                name: None, repo: None, state: None,
+            });
+        }
+        if url.contains("/_wiki/") {
+            return Some(Resource {
+                resource_type: "wiki".to_string(),
+                id: None, url: Some(url.to_string()),
+                name: None, repo: None, state: None,
+            });
+        }
+        if url.contains("/_git/") {
+            // Normalize to /_git/RepoName only
+            let mut normalized = url.to_string();
+            if let Some(git_idx) = normalized.find("/_git/") {
+                let after = &normalized[git_idx + 6..];
+                let repo_name = after.split('/').next().unwrap_or(after).to_string();
+                normalized = format!("{}/_git/{}", &normalized[..git_idx], repo_name);
+            }
+            let name = Regex::new(r"_git/(.+)").ok()
+                .and_then(|re| re.captures(&normalized))
+                .map(|c| c[1].to_string())
+                .unwrap_or_else(|| normalized.clone());
+            return Some(Resource {
+                resource_type: "repo".to_string(),
+                id: None, url: Some(normalized),
+                name: Some(name), repo: None, state: None,
+            });
+        }
+        // Generic link
+        let display_name = url.trim_start_matches("https://").trim_start_matches("http://")
+            .split('/').take(3).collect::<Vec<_>>().join("/");
+        Some(Resource {
+            resource_type: "link".to_string(),
+            id: None, url: Some(url.to_string()),
+            name: Some(display_name), repo: None, state: None,
+        })
+    }
+
+    /// Add a manually-specified resource (by URL) to a session.
+    /// Returns `true` if added, `false` if it was a duplicate.
+    pub fn add_manual_resource(&mut self, session_id: &str, url: &str) -> bool {
+        let resource = match Self::parse_url_to_resource(url) {
+            Some(r) => r,
+            None => return false,
+        };
+        let entry = self.cache.entry(session_id.to_string()).or_insert_with(|| CacheEntry {
+            resources: Vec::new(),
+            manual_resources: None,
+            removed_keys: None,
+            indexed_at: 0,
+        });
+        let manual = entry.manual_resources.get_or_insert_with(Vec::new);
+        let removed = entry.removed_keys.get_or_insert_with(Vec::new);
+        let key = resource_key(&resource);
+
+        // Check for duplicate across auto + manual
+        let existing_keys: HashSet<String> = entry.resources.iter()
+            .chain(manual.iter())
+            .map(resource_key)
+            .collect();
+        if existing_keys.contains(&key) {
+            return false;
+        }
+
+        // Un-remove if previously removed
+        removed.retain(|k| k != &key);
+        manual.push(resource);
+        self.save_cache();
+        true
+    }
+
+    /// Mark a resource as removed for a session (hides it from results).
+    pub fn remove_resource(&mut self, session_id: &str, key: &str) {
+        if let Some(entry) = self.cache.get_mut(session_id) {
+            let removed = entry.removed_keys.get_or_insert_with(Vec::new);
+            if !removed.contains(&key.to_string()) {
+                removed.push(key.to_string());
+            }
+            // Also remove from manual list
+            if let Some(manual) = entry.manual_resources.as_mut() {
+                manual.retain(|r| resource_key(r) != key);
+            }
+            self.save_cache();
+        }
+    }
 }

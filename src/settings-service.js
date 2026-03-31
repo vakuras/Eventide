@@ -6,7 +6,7 @@ const DEFAULTS = {
   sidebarWidth: 280,
   sidebarCollapsed: false,
   lastActiveTab: 'active', // 'active' or 'history'
-  theme: 'mocha', // 'mocha' or 'latte'
+  theme: 'midnight', // 'midnight', 'mocha', or 'latte'
   copilotPath: '', // auto-detect if empty; override with full path to copilot binary
   openTabs: [], // session IDs of tabs to restore on startup
   activeTab: null, // session ID of the last active tab
@@ -16,12 +16,12 @@ const DEFAULTS = {
   promptForWorkdir: false, // show directory picker when creating a new session
   defaultWorkdir: '', // default working directory for new sessions; empty = user home
   autoUpdateEnabled: true, // false = no update checks or downloads
-  updateChannel: 'stable', // 'stable' | 'beta'
+  statusPanelSections: {}, // persisted expand/collapse state for status panel sections
 };
 
 class SettingsService {
   constructor(configDir) {
-    this.configPath = path.join(configDir, 'session-gui-settings.json');
+    this.configPath = path.join(configDir, 'eventide-settings.json');
     this.settings = { ...DEFAULTS };
   }
 

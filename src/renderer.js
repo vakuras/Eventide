@@ -692,6 +692,11 @@ async function init() {
   // Update status listener (auto-update only, no manual button)
   ipcCleanups.push(window.api.onUpdateStatus(handleUpdateStatus));
 
+  // Tauri: listen for startup update check result (dispatched by tauri-bridge.js)
+  window.addEventListener('tauri:update-available', (e) => {
+    handleUpdateStatus({ status: 'available', info: e.detail });
+  });
+
   // Theme switcher
   settingsOverlay.querySelectorAll('.theme-option').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2191,9 +2196,10 @@ async function updateStatusPanel(sessionId) {
   }
 
   // Fetch status data and resources in parallel
-  const [statusData, session] = await Promise.all([
+  const [statusData, session, diffs] = await Promise.all([
     window.api.getSessionStatus(sessionId).catch(() => null),
     Promise.resolve(allSessions.find(s => s.id === sessionId)),
+    window.api.getSessionDiffs ? window.api.getSessionDiffs(sessionId).catch(() => []) : Promise.resolve([]),
   ]);
 
   const resources = session?.resources || [];
@@ -2264,6 +2270,27 @@ async function updateStatusPanel(sessionId) {
     html += renderStatusSection('files', '📂', 'Files Changed', status.files.length, filesHtml);
   }
 
+  // Diffs
+  if (diffs && diffs.length > 0) {
+    const actionLabel = { modified: 'M', added: 'A', deleted: 'D' };
+    const actionCls = { modified: 'status-file-modified', added: 'status-file-added', deleted: 'status-file-deleted' };
+    const diffsHtml = diffs.map((d, i) => {
+      const badge = actionLabel[d.action] || d.action.charAt(0).toUpperCase();
+      const cls = actionCls[d.action] || 'status-file-modified';
+      const diffId = `diff-${i}`;
+      const diffContent = d.diff ? `
+        <div class="status-diff-body hidden" id="${diffId}">
+          <pre class="status-diff-pre">${escapeHtml(d.diff)}</pre>
+        </div>` : '';
+      return `<div class="status-diff-file" data-diff-id="${diffId}">
+        <span class="status-file-badge ${cls}">${escapeHtml(badge)}</span>
+        <span class="status-diff-path">${escapeHtml(d.path)}</span>
+        ${d.diff ? '<span class="status-diff-toggle">▶</span>' : ''}
+      </div>${diffContent}`;
+    }).join('');
+    html += renderStatusSection('diffs', '⟁', 'Diffs', diffs.length, diffsHtml);
+  }
+
   // Pipelines, releases, repos, wikis, links
   const otherResources = resources.filter(r => !['pr', 'workitem'].includes(r.type));
   if (otherResources.length > 0) {
@@ -2309,6 +2336,20 @@ async function updateStatusPanel(sessionId) {
     item.addEventListener('click', () => {
       const url = item.dataset.url;
       if (url && url !== '#') window.api.openExternal(url);
+    });
+  });
+
+  // Wire diff file row clicks → expand/collapse diff content
+  statusPanelBody.querySelectorAll('.status-diff-file').forEach(row => {
+    row.addEventListener('click', () => {
+      const diffId = row.dataset.diffId;
+      if (!diffId) return;
+      const body = document.getElementById(diffId);
+      if (!body) return;
+      const toggle = row.querySelector('.status-diff-toggle');
+      const expanded = !body.classList.contains('hidden');
+      body.classList.toggle('hidden', expanded);
+      if (toggle) toggle.textContent = expanded ? '▶' : '▼';
     });
   });
 }

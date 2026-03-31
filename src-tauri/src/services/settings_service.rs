@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_load_corrupt_file_uses_defaults() {
         let dir = temp_dir();
-        fs::write(dir.path().join("session-gui-settings.json"), "not json!").unwrap();
+        fs::write(dir.path().join("eventide-settings.json"), "not json!").unwrap();
         let mut svc = SettingsService::new(dir.path());
         svc.load();
         assert_eq!(svc.get().theme, "midnight");

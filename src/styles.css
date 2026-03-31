@@ -2569,6 +2569,50 @@ body {
   direction: rtl;
   text-align: left;
 }
+.status-file-deleted { color: var(--red); }
+
+/* Diffs section */
+.status-diff-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.status-diff-file:hover { color: var(--text-bright); }
+.status-diff-path {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.status-diff-toggle {
+  color: var(--text-dimmer);
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.status-diff-body {
+  margin: 2px 0 6px 22px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--mantle);
+}
+.status-diff-body.hidden { display: none; }
+.status-diff-pre {
+  margin: 0;
+  padding: 8px;
+  font-size: 10px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  color: var(--text);
+  white-space: pre;
+  line-height: 1.5;
+}
 
 /* Timeline */
 .status-timeline-item {

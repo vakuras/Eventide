@@ -52,7 +52,7 @@ class SessionService {
       let isCustomTitle = false;
 
       // Check for manual rename (takes priority, never overridden)
-      const customTitlePath = path.join(sessionDir, '.deepsky-title');
+      const customTitlePath = path.join(sessionDir, '.eventide-title');
       try {
         title = (await fs.promises.readFile(customTitlePath, 'utf8')).trim();
         isCustomTitle = !!title;
@@ -92,10 +92,10 @@ class SessionService {
         }
       }
 
-      // Resolve cwd: .deepsky-cwd override → workspace.yaml cwd
+      // Resolve cwd: .eventide-cwd override → workspace.yaml cwd
       let cwd = meta.cwd || '';
       try {
-        const customCwd = (await fs.promises.readFile(path.join(sessionDir, '.deepsky-cwd'), 'utf8')).trim();
+        const customCwd = (await fs.promises.readFile(path.join(sessionDir, '.eventide-cwd'), 'utf8')).trim();
         if (customCwd) cwd = customCwd;
       } catch {}
 
@@ -456,14 +456,14 @@ class SessionService {
   async saveCwd(sessionId, cwd) {
     const sessionDir = path.join(this.dir, sessionId);
     await fs.promises.mkdir(sessionDir, { recursive: true });
-    await fs.promises.writeFile(path.join(sessionDir, '.deepsky-cwd'), cwd.trim(), 'utf8');
+    await fs.promises.writeFile(path.join(sessionDir, '.eventide-cwd'), cwd.trim(), 'utf8');
   }
 
   async getCwd(sessionId) {
     const sessionDir = path.join(this.dir, sessionId);
-    // 1. Check for DeepSky-managed cwd override
+    // 1. Check for Eventide-managed cwd override
     try {
-      const cwd = (await fs.promises.readFile(path.join(sessionDir, '.deepsky-cwd'), 'utf8')).trim();
+      const cwd = (await fs.promises.readFile(path.join(sessionDir, '.eventide-cwd'), 'utf8')).trim();
       if (cwd) return cwd;
     } catch {}
     // 2. Fallback to workspace.yaml cwd
@@ -476,7 +476,7 @@ class SessionService {
   }
 
   async renameSession(sessionId, title) {
-    const customTitlePath = path.join(this.dir, sessionId, '.deepsky-title');
+    const customTitlePath = path.join(this.dir, sessionId, '.eventide-title');
     await fs.promises.writeFile(customTitlePath, title.trim(), 'utf8');
   }
 

@@ -152,7 +152,7 @@ window.api = {
   },
   getUpdateStatus: () => Promise.resolve({ status: 'idle' }),
   applyUpdateSettings: () => Promise.resolve(),
-  onUpdateStatus: (callback) => {
+  onUpdateStatus: (_callback) => {
     return () => {};
   },
 
@@ -206,6 +206,23 @@ invoke('get_settings').then(settings => {
   if (settings?.zoomFactor && settings.zoomFactor !== 1.0) {
     currentZoom = settings.zoomFactor;
     document.body.style.zoom = currentZoom;
+  }
+
+  // Auto-update check on startup (respects autoUpdateEnabled, defaults to true)
+  if (settings?.autoUpdateEnabled !== false) {
+    setTimeout(async () => {
+      try {
+        const { check } = window.__TAURI__?.['updater'] || {};
+        if (!check) return;
+        const update = await check();
+        if (update?.available) {
+          // Dispatch a synthetic event so the renderer's update notification UI picks it up
+          window.dispatchEvent(new CustomEvent('tauri:update-available', {
+            detail: { version: update.version, date: update.date, body: update.body }
+          }));
+        }
+      } catch {}
+    }, 5000);
   }
 });
 

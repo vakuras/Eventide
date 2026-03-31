@@ -60,7 +60,7 @@ function showNotificationPopup(notification) {
   notifWin.loadFile(path.join(__dirname, 'notification-popup.html'));
 
   notifWin.webContents.on('did-finish-load', () => {
-    const theme = settingsService.get().theme || 'mocha';
+    const theme = settingsService.get().theme || 'midnight';
     notifWin.webContents.send('notification:show', { ...notification, theme });
     notifWin.showInactive();
   });
@@ -118,11 +118,11 @@ function resolveCopilotPath() {
   }
 
   // 3. Fall back to bare command name — let the OS resolve it at spawn time
-  return bin;
+  return 'copilot';
 }
 
 function createWindow() {
-  const theme = settingsService.get().theme || 'mocha';
+  const theme = settingsService.get().theme || 'midnight';
   const bg = theme === 'latte' ? '#eff1f5' : '#1e1e2e';
   const fg = theme === 'latte' ? '#4c4f69' : '#cdd6f4';
 

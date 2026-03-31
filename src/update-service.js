@@ -86,11 +86,10 @@ class UpdateService {
   _applySettings() {
     const settings = this.settingsService.get();
     const enabled = settings.autoUpdateEnabled !== false;
-    const isBeta = settings.updateChannel === 'beta';
 
     this.autoUpdater.autoDownload = enabled;
     this.autoUpdater.autoInstallOnAppQuit = enabled;
-    this.autoUpdater.allowPrerelease = isBeta;
+    this.autoUpdater.allowPrerelease = false;
 
     if (!enabled && this._checkTimer) {
       clearInterval(this._checkTimer);

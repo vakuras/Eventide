@@ -21,6 +21,7 @@ use commands::{
     },
     instructions::{read_instructions, write_instructions},
     app::{get_app_version, get_app_changelog},
+    resource::{resource_add, resource_remove},
 };
 
 use services::app_state::AppState;
@@ -77,6 +78,9 @@ pub fn run() {
             // App
             get_app_version,
             get_app_changelog,
+            // Resources
+            resource_add,
+            resource_remove,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Eventide");
