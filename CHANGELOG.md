@@ -2,6 +2,15 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.3] - 2026-04-01
+
+### Added
+- **Drag-to-reorder tabs** — drag tabs to rearrange, order persists across restarts
+- **Double-click tab to rename** — inline rename input on tab title, saves via `.eventide-title`
+
+### Changed
+- **Tauri update UX** — downloads silently in background, shows "Restart to update" button instead of auto-restarting
+
 ## [0.6.2] - 2026-04-01
 
 ### Fixed
