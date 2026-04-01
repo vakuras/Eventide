@@ -915,6 +915,30 @@ body {
   color: var(--bg);
 }
 
+/* Tab drag-to-reorder */
+.tab.dragging {
+  opacity: 0.4;
+}
+.tab.drag-over-left {
+  border-left: 2px solid var(--accent);
+}
+.tab.drag-over-right {
+  border-right: 2px solid var(--accent);
+}
+
+/* Tab inline rename */
+.tab-rename-input {
+  background: var(--bg-base);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 1px 4px;
+  width: 120px;
+  outline: none;
+  font-family: inherit;
+}
+
 /* Terminal container */
 #terminal-main-row {
   flex: 1;

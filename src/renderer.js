@@ -1670,6 +1670,7 @@ function addTab(sessionId, title) {
   tab.dataset.sessionId = sessionId;
   tab.setAttribute('tabindex', '0');
   tab.setAttribute('role', 'tab');
+  tab.draggable = true;
 
   const titleSpan = document.createElement('span');
   titleSpan.className = 'tab-title';
@@ -1683,7 +1684,14 @@ function addTab(sessionId, title) {
 
   tab.appendChild(titleSpan);
   tab.appendChild(closeBtn);
-  tab.addEventListener('click', () => switchToSession(sessionId));
+
+  // Single click switches session (delayed to allow double-click rename)
+  let tabClickTimer = null;
+  tab.addEventListener('click', (e) => {
+    if (e.target.closest('.tab-close') || e.target.closest('.tab-rename-input')) return;
+    if (tabClickTimer) { clearTimeout(tabClickTimer); tabClickTimer = null; }
+    tabClickTimer = setTimeout(() => { tabClickTimer = null; switchToSession(sessionId); }, 200);
+  });
   tab.addEventListener('mousedown', (e) => {
     if (e.button === 1) { // Middle mouse button
       e.preventDefault();
@@ -1691,8 +1699,99 @@ function addTab(sessionId, title) {
     }
   });
 
+  // Double-click tab title to rename
+  titleSpan.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (tabClickTimer) { clearTimeout(tabClickTimer); tabClickTimer = null; }
+    startTabRename(sessionId, titleSpan);
+  });
+
+  // Drag-to-reorder
+  tab.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', sessionId);
+    e.dataTransfer.effectAllowed = 'move';
+    tab.classList.add('dragging');
+    requestAnimationFrame(() => tab.style.opacity = '0.4');
+  });
+  tab.addEventListener('dragend', () => {
+    tab.classList.remove('dragging');
+    tab.style.opacity = '';
+    tabsScrollArea.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('drag-over-left', 'drag-over-right');
+    });
+  });
+  tab.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = tab.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const isLeft = e.clientX < midX;
+    tab.classList.toggle('drag-over-left', isLeft);
+    tab.classList.toggle('drag-over-right', !isLeft);
+  });
+  tab.addEventListener('dragleave', () => {
+    tab.classList.remove('drag-over-left', 'drag-over-right');
+  });
+  tab.addEventListener('drop', (e) => {
+    e.preventDefault();
+    tab.classList.remove('drag-over-left', 'drag-over-right');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const draggedTab = document.querySelector(`.tab[data-session-id="${draggedId}"]`);
+    if (!draggedTab || draggedTab === tab) return;
+    const rect = tab.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    if (e.clientX < midX) {
+      tabsScrollArea.insertBefore(draggedTab, tab);
+    } else {
+      tabsScrollArea.insertBefore(draggedTab, tab.nextSibling);
+    }
+    saveTabOrderFromDom();
+  });
+
   tabsScrollArea.appendChild(tab);
   updateTabScrollButtons();
+}
+
+function saveTabOrderFromDom() {
+  const tabs = tabsScrollArea.querySelectorAll('.tab');
+  const openTabs = [...tabs].map(t => t.dataset.sessionId);
+  window.api.updateSettings({ openTabs, activeTab: activeSessionId, tabGroups, sessionOrder });
+}
+
+function startTabRename(sessionId, titleEl) {
+  const currentTitle = titleEl.title || titleEl.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'tab-rename-input';
+  input.value = currentTitle;
+
+  titleEl.textContent = '';
+  titleEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  const commit = async () => {
+    const newTitle = input.value.trim();
+    if (newTitle && newTitle !== currentTitle) {
+      await window.api.renameSession(sessionId, newTitle);
+      titleEl.textContent = newTitle.length > 25 ? newTitle.substring(0, 22) + '...' : newTitle;
+      titleEl.title = newTitle;
+      await refreshSessionList();
+    } else {
+      const display = currentTitle.length > 25 ? currentTitle.substring(0, 22) + '...' : currentTitle;
+      titleEl.textContent = display;
+      titleEl.title = currentTitle;
+    }
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentTitle; input.blur(); }
+    e.stopPropagation();
+  });
+  input.addEventListener('click', (e) => e.stopPropagation());
 }
 
 function updateTabTitle(sessionId, title) {

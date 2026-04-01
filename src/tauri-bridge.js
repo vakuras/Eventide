@@ -218,10 +218,12 @@ invoke('get_settings').then(settings => {
         if (!check) return;
         const update = await check();
         if (update?.available) {
-          // Dispatch a synthetic event so the renderer's update notification UI picks it up
+          // Notify the UI
           window.dispatchEvent(new CustomEvent('tauri:update-available', {
             detail: { version: update.version, date: update.date, body: update.body }
           }));
+          // Auto-download and install (will restart the app)
+          await update.downloadAndInstall();
         }
       } catch {}
     }, 5000);
