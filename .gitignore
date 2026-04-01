@@ -6,3 +6,7 @@ release/
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/
+
+# Tauri signing keys
+.tauri-private-key
+.tauri-private-key.pub

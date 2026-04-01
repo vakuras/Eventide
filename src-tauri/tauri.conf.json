@@ -48,7 +48,7 @@
       "endpoints": [
         "https://github.com/vakuras/Eventide/releases/latest/download/latest.json"
       ],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgzMTRBMkQ3QzUxM0RGRjEKUldUeDN4UEYxNklVZzlzczI4azRWNFpXWjVZSkFzb2ZaQUg2RGxUemtBOWtIVkU1NElCMnZlTlUK"
     }
   }
 }

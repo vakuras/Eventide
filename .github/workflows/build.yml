@@ -49,11 +49,13 @@ jobs:
         run: npx tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
-      - name: Rename Tauri installer
+      - name: Rename Tauri installer and generate latest.json
         shell: pwsh
         run: |
           $nsisDir = "src-tauri/target/release/bundle/nsis"
+          # Rename installer
           Get-ChildItem "$nsisDir/*.exe" | ForEach-Object {
             $newName = $_.Name -replace '^Eventide_', 'Eventide-Tauri-Setup-'
             $newName = $newName -replace '_x64-setup\.exe$', '.exe'
@@ -62,6 +64,25 @@ jobs:
               Write-Host "Renamed $($_.Name) -> $newName"
             }
           }
+          # Generate latest.json for Tauri updater
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $sigFile = Get-ChildItem "$nsisDir/*.nsis.zip.sig" | Select-Object -First 1
+          $sig = if ($sigFile) { Get-Content $sigFile.FullName -Raw } else { "" }
+          $zipFile = Get-ChildItem "$nsisDir/*.nsis.zip" | Select-Object -First 1
+          $zipName = if ($zipFile) { $zipFile.Name } else { "Eventide_${version}_x64-setup.nsis.zip" }
+          $json = @{
+            version = $version
+            notes = "See https://github.com/vakuras/Eventide/releases/tag/v$version"
+            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $sig.Trim()
+                url = "https://github.com/vakuras/Eventide/releases/download/v$version/$zipName"
+              }
+            }
+          } | ConvertTo-Json -Depth 4
+          Set-Content "$nsisDir/latest.json" $json
+          Write-Host "Generated latest.json for v$version"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -70,7 +91,8 @@ jobs:
             release/*.exe
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/nsis/*.nsis.zip
-            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+            src-tauri/target/release/bundle/nsis/latest.json
           if-no-files-found: warn
 
   release:
