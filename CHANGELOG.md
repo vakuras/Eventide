@@ -2,6 +2,11 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.2] - 2026-04-01
+
+### Fixed
+- **Tauri auto-update** — added signing key and `latest.json` generation so Tauri builds can auto-update from GitHub releases
+
 ## [0.6.1] - 2026-04-01
 
 ### Fixed

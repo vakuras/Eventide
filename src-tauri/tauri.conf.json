@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/refs/heads/v2/tooling/cli/schema.json",
   "productName": "Eventide",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "identifier": "com.vakuras.eventide",
   "build": {
     "frontendDist": "../dist-tauri",
