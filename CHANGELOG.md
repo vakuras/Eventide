@@ -2,6 +2,14 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.1] - 2026-04-01
+
+### Fixed
+- **Instructions panel layout** — panel now correctly fills the main content area without covering the sidebar or titlebar
+- **Status and diff panels positioning** — moved inside terminal column so overlay panels don't break instructions panel containment
+- **Window ready-to-show** — app window stays hidden until fully loaded (no icon flash on startup)
+- **Instructions header buttons** — Export/Import/Close no longer hidden behind window controls
+
 ## [0.6.0] - 2026-03-31
 
 ### Added
