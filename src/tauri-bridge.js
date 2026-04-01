@@ -133,6 +133,7 @@ window.api = {
       if (!check) return { status: 'not-available' };
       const update = await check();
       if (update?.available) {
+        window._tauriPendingUpdate = update;
         return { status: 'available', info: { version: update.version, date: update.date, body: update.body } };
       }
       return { status: 'not-available' };
@@ -142,15 +143,28 @@ window.api = {
   },
   installUpdate: async () => {
     try {
-      const { check } = window.__TAURI__['updater'] || {};
-      if (!check) return;
-      const update = await check();
-      if (update?.available) {
-        await update.downloadAndInstall();
+      const update = window._tauriPendingUpdate;
+      if (update) {
+        if (window._tauriUpdateDownloaded) {
+          // Already downloaded — just install (restarts app)
+          await update.install();
+        } else {
+          await update.downloadAndInstall();
+        }
+      } else {
+        const { check } = window.__TAURI__['updater'] || {};
+        if (!check) return;
+        const freshUpdate = await check();
+        if (freshUpdate?.available) {
+          await freshUpdate.downloadAndInstall();
+        }
       }
     } catch {}
   },
-  getUpdateStatus: () => Promise.resolve({ status: 'idle' }),
+  getUpdateStatus: () => {
+    if (window._tauriUpdateDownloaded) return Promise.resolve({ status: 'downloaded', info: window._tauriUpdateInfo });
+    return Promise.resolve({ status: 'idle' });
+  },
   applyUpdateSettings: () => Promise.resolve(),
   onUpdateStatus: (_callback) => {
     return () => {};
@@ -218,12 +232,17 @@ invoke('get_settings').then(settings => {
         if (!check) return;
         const update = await check();
         if (update?.available) {
-          // Notify the UI
+          window._tauriPendingUpdate = update;
+          window._tauriUpdateInfo = { version: update.version, date: update.date, body: update.body };
+          // Download silently in background
+          try {
+            await update.download();
+            window._tauriUpdateDownloaded = true;
+          } catch {}
+          // Notify the UI — shows "Restart to update" badge
           window.dispatchEvent(new CustomEvent('tauri:update-available', {
-            detail: { version: update.version, date: update.date, body: update.body }
+            detail: { version: update.version, date: update.date, body: update.body, downloaded: window._tauriUpdateDownloaded }
           }));
-          // Auto-download and install (will restart the app)
-          await update.downloadAndInstall();
         }
       } catch {}
     }, 5000);

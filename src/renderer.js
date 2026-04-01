@@ -715,7 +715,8 @@ async function init() {
 
   // Tauri: listen for startup update check result (dispatched by tauri-bridge.js)
   window.addEventListener('tauri:update-available', (e) => {
-    handleUpdateStatus({ status: 'available', info: e.detail });
+    const status = e.detail?.downloaded ? 'downloaded' : 'available';
+    handleUpdateStatus({ status, info: e.detail });
   });
 
   // Theme switcher
@@ -916,8 +917,14 @@ function handleUpdateStatus(data) {
       progressBar.style.width = `${data.progress?.percent || 0}%`;
       break;
     case 'downloaded':
-      statusEl.textContent = `v${data.info?.version} will be installed on next quit.`;
+      statusEl.innerHTML = `v${data.info?.version} ready — <button id="btn-restart-update" class="btn-link" style="color:var(--accent);cursor:pointer">Restart to update</button>`;
       statusEl.className = 'update-status update-available';
+      const restartBtn = document.getElementById('btn-restart-update');
+      if (restartBtn) {
+        restartBtn.addEventListener('click', () => {
+          if (window.api.installUpdate) window.api.installUpdate();
+        });
+      }
       setUpdateBadge(true, data.info?.version, true);
       break;
     case 'error':
