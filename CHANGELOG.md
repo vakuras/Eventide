@@ -2,6 +2,14 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.6] - 2026-04-02
+
+### Fixed
+- **Tauri crash on emoji in session titles** — fixed 6 byte-slicing panics when titles contain ✅⬆️🎉 etc.
+- **Tauri crash on large session resume** — PTY output now batched at 16ms intervals (prevents WebView2 flooding)
+- **Tauri auto-update** — CI now correctly signs the installer, generates `latest.json` with valid signature and URL
+- **Electron auto-update** — `latest.yml` now included in releases
+
 ## [0.6.5] - 2026-04-02
 
 ### Fixed

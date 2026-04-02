@@ -46,12 +46,11 @@ jobs:
         run: npx electron-builder --win --publish never
 
       - name: Build Tauri app
-        run: |
-          echo "TAURI_SIGNING_PRIVATE_KEY length: $($env:TAURI_SIGNING_PRIVATE_KEY.Length)"
-          npx tauri build
+        run: npx tauri build
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
 
       - name: List Tauri build output
         shell: pwsh
@@ -61,34 +60,43 @@ jobs:
         shell: pwsh
         run: |
           $nsisDir = "src-tauri/target/release/bundle/nsis"
-          # Rename installer
-          Get-ChildItem "$nsisDir/*.exe" | ForEach-Object {
-            $newName = $_.Name -replace '^Eventide_', 'Eventide-Tauri-Setup-'
-            $newName = $newName -replace '_x64-setup\.exe$', '.exe'
-            if ($newName -ne $_.Name) {
-              Rename-Item $_.FullName $newName
-              Write-Host "Renamed $($_.Name) -> $newName"
-            }
-          }
-          # Generate latest.json for Tauri updater
           $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $sigFile = Get-ChildItem "$nsisDir/*.nsis.zip.sig" | Select-Object -First 1
-          $sig = if ($sigFile) { Get-Content $sigFile.FullName -Raw } else { "" }
-          $zipFile = Get-ChildItem "$nsisDir/*.nsis.zip" | Select-Object -First 1
-          $zipName = if ($zipFile) { $zipFile.Name } else { "Eventide_${version}_x64-setup.nsis.zip" }
+          $setupName = "Eventide-Tauri-Setup-$version.exe"
+
+          # Rename installer exe
+          $exeFile = Get-ChildItem "$nsisDir/Eventide_*_x64-setup.exe" | Select-Object -First 1
+          if ($exeFile) {
+            Rename-Item $exeFile.FullName $setupName
+            Write-Host "Renamed $($exeFile.Name) -> $setupName"
+          }
+
+          # Rename sig file to match
+          $sigFile = Get-ChildItem "$nsisDir/*.exe.sig" | Select-Object -First 1
+          if ($sigFile) {
+            $sigName = "$setupName.sig"
+            Rename-Item $sigFile.FullName $sigName
+            Write-Host "Renamed $($sigFile.Name) -> $sigName"
+          }
+
+          # Read signature
+          $sig = ""
+          $renamedSig = Join-Path $nsisDir "$setupName.sig"
+          if (Test-Path $renamedSig) { $sig = (Get-Content $renamedSig -Raw).Trim() }
+
+          # Generate latest.json pointing to the exe (Tauri v2 updater uses exe directly)
           $json = @{
             version = $version
             notes = "See https://github.com/vakuras/Eventide/releases/tag/v$version"
             pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
             platforms = @{
               "windows-x86_64" = @{
-                signature = $sig.Trim()
-                url = "https://github.com/vakuras/Eventide/releases/download/v$version/$zipName"
+                signature = $sig
+                url = "https://github.com/vakuras/Eventide/releases/download/v$version/$setupName"
               }
             }
           } | ConvertTo-Json -Depth 4
           Set-Content "$nsisDir/latest.json" $json
-          Write-Host "Generated latest.json for v$version"
+          Write-Host "Generated latest.json for v$version (signature length: $($sig.Length))"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -97,8 +105,7 @@ jobs:
             release/*.exe
             release/latest.yml
             src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.nsis.zip
-            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+            src-tauri/target/release/bundle/nsis/*.exe.sig
             src-tauri/target/release/bundle/nsis/latest.json
           if-no-files-found: warn
 
