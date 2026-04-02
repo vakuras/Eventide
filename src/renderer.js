@@ -28,6 +28,7 @@ let sidebarSearchLoading = false;
 let sidebarSearchTimer = null;
 let sidebarSearchRequestSeq = 0;
 let sidebarCollapsed = false;
+let previousSidebarTab = null;
 let sidebarHidden = false;
 let lastExpandedSidebarWidth = 280;
 let lastDiffPanelWidth = 500;
@@ -36,9 +37,9 @@ let currentDiffData = null;
 let currentDiffFile = null;
 const sessionPromptGhostState = new Map();
 
-const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 450;
-const SIDEBAR_COLLAPSED_WIDTH = 68;
+const SIDEBAR_COLLAPSED_WIDTH = 48;
 
 // Tab group state
 let tabGroups = []; // Array of { id, name, color, collapsed, tabIds }
@@ -121,15 +122,15 @@ const defaultWorkdirInput = document.getElementById('default-workdir');
 const btnPickDefaultWorkdir = document.getElementById('btn-pick-default-workdir');
 const btnClearDefaultWorkdir = document.getElementById('btn-clear-default-workdir');
 const instructionsPanel = document.getElementById('instructions-panel');
-const instructionsRendered = document.getElementById('instructions-rendered');
+const instructionsEditor = document.getElementById('instructions-editor');
 const btnInstructions = document.getElementById('btn-instructions');
-const btnCloseInstructions = document.getElementById('btn-close-instructions');
 const terminalArea = document.getElementById('terminal-area');
 const settingsOverlay = document.getElementById('settings-overlay');
 const btnSettings = document.getElementById('btn-settings');
 const statusPanel = document.getElementById('status-panel');
 const statusPanelBody = document.getElementById('status-panel-body');
 const btnToggleStatus = document.getElementById('btn-toggle-status');
+const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
 const diffPanel = document.getElementById('diff-panel');
 const diffFileList = document.getElementById('diff-file-list');
 const diffViewArea = document.getElementById('diff-view-area');
@@ -445,9 +446,23 @@ function syncSidebarCollapsedUi() {
   } else {
     sidebar.style.width = `${sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : lastExpandedSidebarWidth}px`;
   }
+  if (btnSidebarToggle) btnSidebarToggle.textContent = sidebarCollapsed ? '»' : '«';
 }
 
 function setSidebarCollapsed(collapsed, { persist = true } = {}) {
+  if (collapsed) {
+    previousSidebarTab = currentSidebarTab;
+    if (currentSidebarTab === 'history') {
+      currentSidebarTab = 'active';
+      document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'active'));
+    }
+  } else {
+    if (previousSidebarTab === 'history') {
+      currentSidebarTab = 'history';
+      document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'history'));
+    }
+  }
+
   if (collapsed === sidebarCollapsed && sidebar.style.width) {
     syncSidebarCollapsedUi();
     return;
@@ -700,6 +715,11 @@ async function init() {
       renderSessionList();
       window.api.updateSettings({ lastActiveTab: currentSidebarTab });
     });
+  });
+
+  // Sidebar toggle button
+  btnSidebarToggle.addEventListener('click', () => {
+    setSidebarCollapsed(!sidebarCollapsed);
   });
 
   // Settings modal
@@ -2694,184 +2714,31 @@ function fitActiveTerminal() {
 
 // Instructions panel
 async function showInstructions() {
+  // Toggle: if already visible, hide it
+  if (!instructionsPanel.classList.contains('hidden')) {
+    hideInstructions();
+    return;
+  }
   const content = await window.api.readInstructions();
   originalInstructions = content;
   currentInstructions = content;
-
-  renderMarkdown(content);
-
+  instructionsEditor.value = content;
+  updateInstructionsUnsaved(false);
   instructionsPanel.classList.remove('hidden');
   terminalArea.style.display = 'none';
-}
-
-function renderMarkdown(md, changedLineNumbers) {
-  const changedSet = new Set(changedLineNumbers || []);
-  const lines = md.replace(/\r\n/g, '\n').split('\n');
-
-  // First pass: collect headers for TOC
-  const headers = [];
-  let inCB = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith('```')) { inCB = !inCB; continue; }
-    if (inCB) continue;
-    const m3 = lines[i].match(/^(#{1,3}) (.+)$/);
-    if (m3) {
-      const level = m3[1].length;
-      const text = m3[2].replace(/\*\*/g, '').replace(/\*/g, '');
-      const id = 'sec-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      headers.push({ level, text, id, lineNum: i });
-    }
-  }
-
-  // Build TOC
-  let toc = '<nav class="instructions-toc"><div class="toc-title">Contents</div><ul>';
-  for (const h of headers) {
-    const indent = h.level === 1 ? '' : h.level === 2 ? 'toc-l2' : 'toc-l3';
-    toc += `<li class="${indent}"><a href="#${h.id}">${escapeHtml(h.text)}</a></li>`;
-  }
-  toc += '</ul></nav>';
-
-  // Second pass: render content grouped into collapsible sections
-  // Each h1/h2 starts a new <details> section; h3 stays inside the current one
-  let html = toc;
-  let inCodeBlock = false;
-  let codeBlockContent = '';
-  let codeBlockStartLine = -1;
-  let listItems = [];
-  let openDetails = 0; // nesting depth of open <details>
-
-  function flushList() {
-    if (listItems.length === 0) return;
-    const anyChanged = listItems.some(li => changedSet.has(li.lineNum));
-    const cls = anyChanged ? ' class="changed-line"' : '';
-    html += `<ul${cls}>` + listItems.map(li => `<li>${processInline(li.text)}</li>`).join('') + '</ul>';
-    listItems = [];
-  }
-
-  function processInline(text) {
-    const codeSpans = [];
-    text = text
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/`([^`]+)`/g, (match, code) => {
-        codeSpans.push(`<code>${code}</code>`);
-        return `\x00CODE${codeSpans.length - 1}\x00`;
-      })
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/\x00CODE(\d+)\x00/g, (_, i) => codeSpans[parseInt(i)]);
-    return text;
-  }
-
-  function closeOpenDetails() {
-    flushList();
-    while (openDetails > 0) { html += '</div></details>'; openDetails--; }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const changed = changedSet.has(i);
-    const cls = changed ? ' class="changed-line"' : '';
-
-    // Code block toggle
-    if (line.startsWith('```')) {
-      if (inCodeBlock) {
-        const anyChanged = changedSet.has(codeBlockStartLine) || changedSet.has(i);
-        const ccls = anyChanged ? ' class="changed-line"' : '';
-        html += `<pre${ccls}><code>${codeBlockContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').trim()}</code></pre>`;
-        inCodeBlock = false;
-        codeBlockContent = '';
-      } else {
-        flushList();
-        inCodeBlock = true;
-        codeBlockStartLine = i;
-        codeBlockContent = '';
-      }
-      continue;
-    }
-    if (inCodeBlock) { codeBlockContent += line + '\n'; continue; }
-
-    // List items
-    if (/^[-*] /.test(line)) {
-      listItems.push({ text: line.replace(/^[-*] /, ''), lineNum: i });
-      continue;
-    } else {
-      flushList();
-    }
-
-    // Empty line
-    if (line.trim() === '') { html += '\n'; continue; }
-
-    // Headers — h1/h2 start collapsible sections
-    const headerInfo = headers.find(h => h.lineNum === i);
-    if (headerInfo) {
-      if (headerInfo.level <= 2) {
-        closeOpenDetails();
-        const tag = headerInfo.level === 1 ? 'h1' : 'h2';
-        html += `<details class="section-collapse" open><summary${cls}><${tag} id="${headerInfo.id}">${processInline(headerInfo.text)}</${tag}></summary><div class="section-body">`;
-        openDetails++;
-      } else {
-        flushList();
-        html += `<h3 id="${headerInfo.id}"${cls}>${processInline(headerInfo.text)}</h3>`;
-      }
-      continue;
-    }
-
-    // HR
-    if (/^---+$/.test(line)) { html += '<hr>'; continue; }
-
-    // Blockquote
-    if (line.startsWith('> ')) { html += `<blockquote${cls}>${processInline(line.slice(2))}</blockquote>`; continue; }
-
-    // Table rows
-    if (line.startsWith('|') && line.endsWith('|')) {
-      let tableRows = [{ line, lineNum: i }];
-      while (i + 1 < lines.length && lines[i + 1].startsWith('|') && lines[i + 1].endsWith('|')) {
-        i++;
-        tableRows.push({ line: lines[i], lineNum: i });
-      }
-      const anyChanged = tableRows.some(r => changedSet.has(r.lineNum));
-      const tcls = anyChanged ? ' class="changed-line"' : '';
-      let table = `<table${tcls}>`;
-      tableRows.forEach((row, ri) => {
-        const cells = row.line.split('|').filter(c => c.trim());
-        if (cells.every(c => /^[-:]+$/.test(c.trim()))) return;
-        const tag = ri === 0 ? 'th' : 'td';
-        table += '<tr>' + cells.map(c => `<${tag}>${processInline(c.trim())}</${tag}>`).join('') + '</tr>';
-      });
-      table += '</table>';
-      html += table;
-      continue;
-    }
-
-    // Paragraph
-    html += `<p${cls}>${processInline(line)}</p>`;
-  }
-  closeOpenDetails();
-
-  instructionsRendered.innerHTML = html;
-
-  // TOC click — smooth scroll
-  instructionsRendered.querySelectorAll('.instructions-toc a').forEach(a => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      const id = a.getAttribute('href').slice(1);
-      const target = instructionsRendered.querySelector('#' + id);
-      if (target) {
-        // Make sure parent details is open
-        const details = target.closest('details');
-        if (details && !details.open) details.open = true;
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
-  });
-
-  // Fade out change highlights — handled by CSS animation now
+  instructionsEditor.focus();
 }
 
 function hideInstructions() {
+  // Discard unsaved changes on close
+  currentInstructions = originalInstructions;
+  updateInstructionsUnsaved(false);
   instructionsPanel.classList.add('hidden');
   terminalArea.style.display = '';
+}
+
+function updateInstructionsUnsaved(unsaved) {
+  btnInstructions.classList.toggle('unsaved', unsaved);
 }
 
 // Import/export instructions
@@ -2886,91 +2753,43 @@ async function exportInstructions() {
   URL.revokeObjectURL(url);
 }
 
-function importInstructions(mode) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.md,.txt,.markdown';
-  input.addEventListener('change', async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-
-    if (mode === 'override') {
-      currentInstructions = text;
-      await window.api.writeInstructions(text);
-      renderMarkdown(text);
-    } else {
-      // Merge — append non-duplicate lines
-      const existingLines = new Set(
-        currentInstructions.split('\n')
-          .map(l => l.trim())
-          .filter(l => l && l !== '---' && !l.match(/^#{1,6}\s/) && l !== '```')
-      );
-      const newLines = text.split('\n');
-      const toAdd = [];
-      newLines.forEach(line => {
-        if (line.trim() && !existingLines.has(line.trim())) {
-          toAdd.push(line);
-        }
-      });
-      if (toAdd.length > 0) {
-        const merged = currentInstructions.trimEnd() + '\n\n' + toAdd.join('\n') + '\n';
-        currentInstructions = merged;
-        await window.api.writeInstructions(merged);
-        renderMarkdown(merged);
-      }
-    }
-  });
-  input.click();
-}
-
 btnInstructions.addEventListener('click', showInstructions);
-btnCloseInstructions.addEventListener('click', hideInstructions);
+
+instructionsEditor.addEventListener('input', () => {
+  currentInstructions = instructionsEditor.value;
+  updateInstructionsUnsaved(currentInstructions !== originalInstructions);
+});
+
+document.getElementById('btn-apply-instructions').addEventListener('click', async () => {
+  await window.api.writeInstructions(currentInstructions);
+  originalInstructions = currentInstructions;
+  updateInstructionsUnsaved(false);
+  showToast({ type: 'success', title: 'Instructions saved', body: 'Copilot instructions updated.' });
+});
+
+document.getElementById('btn-reset-instructions').addEventListener('click', async () => {
+  const content = await window.api.readInstructions();
+  originalInstructions = content;
+  currentInstructions = content;
+  instructionsEditor.value = content;
+  updateInstructionsUnsaved(false);
+});
 
 // Import/export
 document.getElementById('btn-export-instructions').addEventListener('click', exportInstructions);
 document.getElementById('btn-import-instructions').addEventListener('click', () => {
-  showImportMenu();
-});
-
-function showImportMenu() {
-  // Remove existing menu if any
-  document.querySelectorAll('.import-menu').forEach(el => el.remove());
-
-  const btn = document.getElementById('btn-import-instructions');
-  const rect = btn.getBoundingClientRect();
-  const menu = document.createElement('div');
-  menu.className = 'import-menu';
-  menu.style.top = (rect.bottom + 4) + 'px';
-  menu.style.right = (window.innerWidth - rect.right) + 'px';
-  menu.innerHTML = `
-    <button class="import-menu-item" data-mode="merge">
-      <span class="import-menu-icon">+</span>
-      <span><strong>Merge</strong><br><span class="import-menu-desc">Add new lines, keep existing</span></span>
-    </button>
-    <button class="import-menu-item" data-mode="override">
-      <span class="import-menu-icon">↻</span>
-      <span><strong>Override</strong><br><span class="import-menu-desc">Replace everything</span></span>
-    </button>
-  `;
-  document.body.appendChild(menu);
-
-  menu.querySelectorAll('.import-menu-item').forEach(item => {
-    item.addEventListener('click', () => {
-      importInstructions(item.dataset.mode);
-      menu.remove();
-    });
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.md,.txt';
+  input.addEventListener('change', async () => {
+    if (!input.files.length) return;
+    const text = await input.files[0].text();
+    instructionsEditor.value = text;
+    currentInstructions = text;
+    updateInstructionsUnsaved(currentInstructions !== originalInstructions);
   });
-
-  // Close on click outside
-  const closeMenu = (e) => {
-    if (!menu.contains(e.target) && e.target !== btn) {
-      menu.remove();
-      document.removeEventListener('click', closeMenu, true);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeMenu, true), 0);
-}
+  input.click();
+});
 
 // Date helpers
 function getDateLabel(dateStr) {
@@ -3066,12 +2885,8 @@ document.addEventListener('mouseup', () => {
     document.body.style.userSelect = '';
 
     if (!resizeDidDrag) {
-      // Click → toggle full hide
-      sidebarHidden = !sidebarHidden;
-      if (sidebarHidden) sidebarCollapsed = false;
-      syncSidebarCollapsedUi();
-      if (window._cachedSettings) window._cachedSettings.sidebarCollapsed = sidebarHidden;
-      window.api.updateSettings({ sidebarCollapsed: sidebarHidden });
+      // Click → toggle collapsed (same as « button)
+      setSidebarCollapsed(!sidebarCollapsed);
       renderSessionList();
     } else {
       const width = parseInt(sidebar.style.width, 10);

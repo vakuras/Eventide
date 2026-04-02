@@ -2,6 +2,26 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.4] - 2026-04-02
+
+### Added
+- **Sidebar minimize toggle** — `«`/`»` button at sidebar bottom, DevOps-style collapse to 48px icon strip
+- **Copilot Instructions editor** — inline textarea replaces read-only viewer; Apply/Reset buttons, unsaved indicator
+- **Tab rename** — double-click tab title to rename inline
+
+### Changed
+- **Titlebar button order** — Diff, Status, Alerts, Instructions, Settings (moved ±/☷ from tab bar to titlebar)
+- **Instructions toggle** — ☰ button now opens AND closes the panel (no separate Close button)
+- **Sidebar collapse** — resize handle click minimizes sidebar (instead of full-hide)
+- **Hidden Active/History tabs** when sidebar is minimized
+- **Search icon** — `⌕` replaces emoji, expands sidebar on click when minimized
+- **Import** loads file into editor without auto-saving (Apply required)
+
+### Removed
+- Tab drag-to-reorder (inconsistent across Electron/Tauri)
+- Markdown viewer and TOC rendering (replaced by editor)
+- Close button from instructions panel
+
 ## [0.6.3] - 2026-04-01
 
 ### Added

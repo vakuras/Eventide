@@ -13,8 +13,10 @@
   <div id="titlebar">
     <span class="titlebar-text" id="titlebar-home" title="Home">Eventide</span>
     <div class="titlebar-actions">
+      <button id="btn-toggle-diff" title="Diff View (Ctrl+D)">±</button>
+      <button id="btn-toggle-status" title="Session Status (Ctrl+I)">☷</button>
       <button id="btn-notifications" title="Alerts">⚐<span id="notification-badge" class="notification-badge hidden">0</span></button>
-      <button id="btn-instructions" title="Instructions">☰</button>
+      <button id="btn-instructions" title="Copilot Instructions">☰</button>
       <button id="btn-settings" title="Settings">⚙</button>
     </div>
     <div class="titlebar-window-controls" id="titlebar-window-controls" style="display:none">
@@ -32,7 +34,7 @@
       <aside id="sidebar">
         <div id="sidebar-header">
           <div id="search-wrapper">
-            <button id="sidebar-search-toggle" class="sidebar-icon-btn" title="Search sessions (Ctrl+F)">🔍</button>
+            <button id="sidebar-search-toggle" class="sidebar-icon-btn" title="Search sessions (Ctrl+F)">⌕</button>
             <input type="text" id="search" placeholder="Search sessions, tags & content..." autocomplete="off" spellcheck="false">
             <button id="search-clear" class="search-clear hidden" title="Clear search (Esc)">✕</button>
           </div>
@@ -45,6 +47,7 @@
           <button class="sidebar-tab" data-tab="history"><span class="sidebar-tab-short">H</span><span class="sidebar-tab-label">History</span></button>
         </div>
         <div id="session-list"></div>
+        <button id="btn-sidebar-toggle" class="sidebar-toggle" title="Toggle sidebar">«</button>
       </aside>
 
     <!-- Resize handle -->
@@ -59,8 +62,6 @@
           <div class="tabs-scroll-area">
           </div>
           <button class="tab-scroll-btn tab-scroll-right" title="Scroll right">▶</button>
-          <button id="btn-toggle-diff" title="Diff View (Ctrl+D)">±</button>
-          <button id="btn-toggle-status" title="Session Status (Ctrl+I)">☷</button>
         </div>
           <div id="terminal-main-row">
             <div id="terminal-column">
@@ -114,15 +115,16 @@
       <!-- Instructions panel (hidden by default) -->
       <div id="instructions-panel" class="hidden">
         <div id="instructions-header">
-          <h2>Custom Instructions</h2>
+          <h2>Copilot Instructions</h2>
           <div id="instructions-actions">
+            <button id="btn-reset-instructions" class="btn-secondary" title="Reset to saved">Reset</button>
+            <button id="btn-apply-instructions" class="btn-secondary" title="Save changes">Apply</button>
             <button id="btn-export-instructions" class="btn-secondary" title="Export to file">Export</button>
             <button id="btn-import-instructions" class="btn-secondary" title="Import from file">Import</button>
-            <button id="btn-close-instructions" class="btn-secondary">Close</button>
           </div>
         </div>
         <div id="instructions-body">
-          <div id="instructions-rendered"></div>
+          <textarea id="instructions-editor" spellcheck="false" placeholder="Write your Copilot instructions here..."></textarea>
         </div>
       </div>
     </main>
