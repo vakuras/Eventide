@@ -2,6 +2,11 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.5] - 2026-04-02
+
+### Fixed
+- **Tauri auto-update** — fix signing key password handling in CI; ensure `.nsis.zip` and signature are generated
+
 ## [0.6.4] - 2026-04-02
 
 ### Added
