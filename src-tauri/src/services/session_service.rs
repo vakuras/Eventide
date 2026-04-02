@@ -164,23 +164,27 @@ impl SessionService {
                 if let Some(pos) = title.find("answer:") {
                     title = title[pos + 7..].trim().to_string();
                     if title.len() > 60 {
-                        title = format!("{}...", &title[..57]);
+                        let end = snap_to_char_boundary(&title, 57, false);
+                        title = format!("{}...", &title[..end]);
                     }
                     return title;
                 }
                 if title.len() > 60 {
-                    title = title[..60].to_string();
+                    let end = snap_to_char_boundary(&title, 60, false);
+                    title = title[..end].to_string();
                 }
                 return title;
             }
             if title.starts_with("Follow the workflow") && title.len() > 60 {
-                title = title[..60].to_string();
+                let end = snap_to_char_boundary(&title, 60, false);
+                title = title[..end].to_string();
                 return title;
             }
         }
 
         if title.len() > 70 {
-            title = format!("{}...", &title[..67]);
+            let end = snap_to_char_boundary(&title, 67, false);
+            title = format!("{}...", &title[..end]);
         }
 
         title
@@ -213,7 +217,8 @@ impl SessionService {
                     {
                         let mut title = content.trim().lines().next().unwrap_or("").to_string();
                         if title.len() > 70 {
-                            title = format!("{}...", &title[..67]);
+                            let end = snap_to_char_boundary(&title, 67, false);
+                            title = format!("{}...", &title[..end]);
                         }
                         return Some(title);
                     }
@@ -350,7 +355,8 @@ impl SessionService {
                     continue;
                 }
                 last_prompt = if prompt.len() > 160 {
-                    format!("{}...", &prompt[..157])
+                    let end = snap_to_char_boundary(&prompt, 157, false);
+                    format!("{}...", &prompt[..end])
                 } else {
                     prompt
                 };
@@ -586,6 +592,36 @@ mod tests {
         let svc = SessionService::new(Path::new("/tmp"));
         let result = svc.clean_auto_title("\"Use the 'knowledge-based-answer' answer: what is Tauri?\"");
         assert_eq!(result, "what is Tauri?");
+    }
+
+    #[test]
+    fn test_clean_auto_title_emoji_boundary() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        // 68 chars with emoji at positions that cross byte boundaries
+        let title = format!("{}✅ done", "a".repeat(65));
+        let result = svc.clean_auto_title(&title);
+        assert!(result.ends_with("..."));
+        // Must not panic — the emoji is multi-byte
+        assert!(result.len() <= 75); // 67 + "..."
+    }
+
+    #[test]
+    fn test_clean_auto_title_multibyte_no_panic() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        // Title with lots of emoji that would break byte slicing
+        let title = "⬆️ Uploading ✅ Done ⬆️ More ✅ Items ⬆️ Even ✅ More ⬆️ Keep ✅ Going ⬆️ And ✅ More";
+        let result = svc.clean_auto_title(title);
+        // Should not panic and should be truncated
+        assert!(result.len() < 100);
+    }
+
+    #[test]
+    fn test_clean_auto_title_knowledge_emoji() {
+        let svc = SessionService::new(Path::new("/tmp"));
+        let title = format!("\"Use the 'knowledge-based-answer' answer: {}\"", "🎉".repeat(30));
+        let result = svc.clean_auto_title(&title);
+        // Should not panic
+        assert!(result.len() <= 65);
     }
 
     // --- CWD resolution ---

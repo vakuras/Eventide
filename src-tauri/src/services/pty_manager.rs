@@ -121,8 +121,12 @@ impl PtyManager {
         let app_for_stdout = app_handle.clone();
         thread::spawn(move || {
             use std::io::Read;
+            use std::time::{Instant, Duration};
             let mut reader = stdout;
-            let mut buf = [0u8; 4096];
+            let mut buf = [0u8; 8192];
+            let mut pending = String::new();
+            let mut last_flush = Instant::now();
+            let flush_interval = Duration::from_millis(16);
             loop {
                 if *kill_for_reader.lock().unwrap() {
                     break;
@@ -130,14 +134,25 @@ impl PtyManager {
                 match reader.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
-                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let _ = app_for_stdout.emit("pty:data", serde_json::json!({
-                            "sessionId": sid_for_reader,
-                            "data": data,
-                        }));
+                        pending.push_str(&String::from_utf8_lossy(&buf[..n]));
+                        if last_flush.elapsed() >= flush_interval || pending.len() > 32768 {
+                            let _ = app_for_stdout.emit("pty:data", serde_json::json!({
+                                "sessionId": sid_for_reader,
+                                "data": pending,
+                            }));
+                            pending = String::new();
+                            last_flush = Instant::now();
+                        }
                     }
                     Err(_) => break,
                 }
+            }
+            // Flush remaining
+            if !pending.is_empty() {
+                let _ = app_for_stdout.emit("pty:data", serde_json::json!({
+                    "sessionId": sid_for_reader,
+                    "data": pending,
+                }));
             }
         });
 
