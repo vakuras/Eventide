@@ -918,6 +918,7 @@ body {
 /* Tab drag-to-reorder */
 .tab.dragging {
   opacity: 0.4;
+  cursor: grabbing;
 }
 .tab.drag-over-left {
   border-left: 2px solid var(--accent);

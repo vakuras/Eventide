@@ -1677,7 +1677,6 @@ function addTab(sessionId, title) {
   tab.dataset.sessionId = sessionId;
   tab.setAttribute('tabindex', '0');
   tab.setAttribute('role', 'tab');
-  tab.draggable = true;
 
   const titleSpan = document.createElement('span');
   titleSpan.className = 'tab-title';
@@ -1691,19 +1690,19 @@ function addTab(sessionId, title) {
 
   tab.appendChild(titleSpan);
   tab.appendChild(closeBtn);
+  tab.draggable = true;
 
-  // Single click switches session (delayed to allow double-click rename)
+  // Click to switch session (delayed to allow double-click rename)
   let tabClickTimer = null;
   tab.addEventListener('click', (e) => {
     if (e.target.closest('.tab-close') || e.target.closest('.tab-rename-input')) return;
     if (tabClickTimer) { clearTimeout(tabClickTimer); tabClickTimer = null; }
     tabClickTimer = setTimeout(() => { tabClickTimer = null; switchToSession(sessionId); }, 200);
   });
+
+  // Middle-click to close
   tab.addEventListener('mousedown', (e) => {
-    if (e.button === 1) { // Middle mouse button
-      e.preventDefault();
-      closeTab(sessionId);
-    }
+    if (e.button === 1) { e.preventDefault(); closeTab(sessionId); }
   });
 
   // Double-click tab title to rename
@@ -1714,28 +1713,24 @@ function addTab(sessionId, title) {
     startTabRename(sessionId, titleSpan);
   });
 
-  // Drag-to-reorder
+  // HTML5 drag-to-reorder
   tab.addEventListener('dragstart', (e) => {
+    if (tabClickTimer) { clearTimeout(tabClickTimer); tabClickTimer = null; }
     e.dataTransfer.setData('text/plain', sessionId);
     e.dataTransfer.effectAllowed = 'move';
     tab.classList.add('dragging');
-    requestAnimationFrame(() => tab.style.opacity = '0.4');
   });
   tab.addEventListener('dragend', () => {
     tab.classList.remove('dragging');
-    tab.style.opacity = '';
-    tabsScrollArea.querySelectorAll('.tab').forEach(t => {
-      t.classList.remove('drag-over-left', 'drag-over-right');
-    });
+    tabsScrollArea.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over-left', 'drag-over-right'));
   });
   tab.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     const rect = tab.getBoundingClientRect();
     const midX = rect.left + rect.width / 2;
-    const isLeft = e.clientX < midX;
-    tab.classList.toggle('drag-over-left', isLeft);
-    tab.classList.toggle('drag-over-right', !isLeft);
+    tab.classList.toggle('drag-over-left', e.clientX < midX);
+    tab.classList.toggle('drag-over-right', e.clientX >= midX);
   });
   tab.addEventListener('dragleave', () => {
     tab.classList.remove('drag-over-left', 'drag-over-right');
@@ -1747,8 +1742,7 @@ function addTab(sessionId, title) {
     const draggedTab = document.querySelector(`.tab[data-session-id="${draggedId}"]`);
     if (!draggedTab || draggedTab === tab) return;
     const rect = tab.getBoundingClientRect();
-    const midX = rect.left + rect.width / 2;
-    if (e.clientX < midX) {
+    if (e.clientX < rect.left + rect.width / 2) {
       tabsScrollArea.insertBefore(draggedTab, tab);
     } else {
       tabsScrollArea.insertBefore(draggedTab, tab.nextSibling);
