@@ -46,7 +46,10 @@ jobs:
         run: npx electron-builder --win --publish never
 
       - name: Build Tauri app
-        run: npx tauri build
+        run: |
+          echo "TAURI_SIGNING_PRIVATE_KEY length: $($env:TAURI_SIGNING_PRIVATE_KEY.Length)"
+          npx tauri build
+        shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
