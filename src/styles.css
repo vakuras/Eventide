@@ -866,6 +866,7 @@ body {
   transition: all 0.1s;
   max-width: 200px;
   position: relative;
+  user-select: none;
 }
 
 .tab:hover {
@@ -913,18 +914,6 @@ body {
 .tab-close:hover {
   background: var(--red);
   color: var(--bg);
-}
-
-/* Tab drag-to-reorder */
-.tab.dragging {
-  opacity: 0.4;
-  cursor: grabbing;
-}
-.tab.drag-over-left {
-  border-left: 2px solid var(--accent);
-}
-.tab.drag-over-right {
-  border-right: 2px solid var(--accent);
 }
 
 /* Tab inline rename */

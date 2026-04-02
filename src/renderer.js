@@ -1690,7 +1690,6 @@ function addTab(sessionId, title) {
 
   tab.appendChild(titleSpan);
   tab.appendChild(closeBtn);
-  tab.draggable = true;
 
   // Click to switch session (delayed to allow double-click rename)
   let tabClickTimer = null;
@@ -1701,7 +1700,7 @@ function addTab(sessionId, title) {
   });
 
   // Middle-click to close
-  tab.addEventListener('mousedown', (e) => {
+  tab.addEventListener('auxclick', (e) => {
     if (e.button === 1) { e.preventDefault(); closeTab(sessionId); }
   });
 
@@ -1713,52 +1712,10 @@ function addTab(sessionId, title) {
     startTabRename(sessionId, titleSpan);
   });
 
-  // HTML5 drag-to-reorder
-  tab.addEventListener('dragstart', (e) => {
-    if (tabClickTimer) { clearTimeout(tabClickTimer); tabClickTimer = null; }
-    e.dataTransfer.setData('text/plain', sessionId);
-    e.dataTransfer.effectAllowed = 'move';
-    tab.classList.add('dragging');
-  });
-  tab.addEventListener('dragend', () => {
-    tab.classList.remove('dragging');
-    tabsScrollArea.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over-left', 'drag-over-right'));
-  });
-  tab.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const rect = tab.getBoundingClientRect();
-    const midX = rect.left + rect.width / 2;
-    tab.classList.toggle('drag-over-left', e.clientX < midX);
-    tab.classList.toggle('drag-over-right', e.clientX >= midX);
-  });
-  tab.addEventListener('dragleave', () => {
-    tab.classList.remove('drag-over-left', 'drag-over-right');
-  });
-  tab.addEventListener('drop', (e) => {
-    e.preventDefault();
-    tab.classList.remove('drag-over-left', 'drag-over-right');
-    const draggedId = e.dataTransfer.getData('text/plain');
-    const draggedTab = document.querySelector(`.tab[data-session-id="${draggedId}"]`);
-    if (!draggedTab || draggedTab === tab) return;
-    const rect = tab.getBoundingClientRect();
-    if (e.clientX < rect.left + rect.width / 2) {
-      tabsScrollArea.insertBefore(draggedTab, tab);
-    } else {
-      tabsScrollArea.insertBefore(draggedTab, tab.nextSibling);
-    }
-    saveTabOrderFromDom();
-  });
-
   tabsScrollArea.appendChild(tab);
   updateTabScrollButtons();
 }
 
-function saveTabOrderFromDom() {
-  const tabs = tabsScrollArea.querySelectorAll('.tab');
-  const openTabs = [...tabs].map(t => t.dataset.sessionId);
-  window.api.updateSettings({ openTabs, activeTab: activeSessionId, tabGroups, sessionOrder });
-}
 
 function startTabRename(sessionId, titleEl) {
   const currentTitle = titleEl.title || titleEl.textContent;
