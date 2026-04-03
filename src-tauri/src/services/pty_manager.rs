@@ -78,7 +78,9 @@ impl PtyManager {
         use std::process::{Command, Stdio};
 
         let self_exe = std::env::current_exe().map_err(|e| format!("Can't find self exe: {}", e))?;
-        let pty_host = self_exe.parent().unwrap().join("pty_host.exe");
+        let pty_host = self_exe.parent()
+            .ok_or_else(|| format!("Executable has no parent directory: {:?}", self_exe))?
+            .join("pty_host.exe");
 
         if !pty_host.exists() {
             return Err(format!("pty_host.exe not found at {:?}", pty_host));

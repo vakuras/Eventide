@@ -450,7 +450,6 @@ class SessionService {
       }
     }
 
-    console.log(`Cleaned ${cleaned} empty sessions`);
     return cleaned;
   }
   async saveCwd(sessionId, cwd) {

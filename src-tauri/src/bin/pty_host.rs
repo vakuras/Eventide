@@ -63,8 +63,10 @@ fn main() {
     drop(pair.slave);
 
     let master = Arc::new(Mutex::new(pair.master));
-    let mut reader = master.lock().unwrap().try_clone_reader().unwrap();
-    let mut writer = master.lock().unwrap().take_writer().unwrap();
+    let mut reader = master.lock().unwrap().try_clone_reader()
+        .expect("Failed to clone PTY reader");
+    let mut writer = master.lock().unwrap().take_writer()
+        .expect("Failed to take PTY writer");
 
     // PTY → stdout
     let master_for_resize = master.clone();

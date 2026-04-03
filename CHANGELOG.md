@@ -2,6 +2,12 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.8] - 2026-04-03
+
+### Fixed
+- **PTY input delay** — reverted timer-based batching that caused characters to buffer until next keystroke
+- **Code quality** — moved regex compilation out of hot loops, replaced panicking unwraps with proper error handling, removed debug console.log
+
 ## [0.6.7] - 2026-04-03
 
 ### Fixed

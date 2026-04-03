@@ -316,6 +316,7 @@ impl StatusService {
 
         let reader = BufReader::new(file);
         let mut files: HashMap<String, String> = HashMap::new();
+        let path_re = regex::Regex::new(r#""path"\s*:\s*"([^"]+)""#).ok();
 
         for line in reader.lines().flatten() {
             if let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) {
@@ -336,8 +337,8 @@ impl StatusService {
                             .and_then(|s| {
                                 s.find("\"path\"")
                                     .and_then(|_| {
-                                        let re = regex::Regex::new(r#""path"\s*:\s*"([^"]+)""#).ok()?;
-                                        re.captures(s).map(|c| c.get(1).unwrap().as_str())
+                                        path_re.as_ref()?
+                                            .captures(s).and_then(|c| c.get(1)).map(|m| m.as_str())
                                     })
                             })
                     });

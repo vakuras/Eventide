@@ -151,14 +151,14 @@ impl ResourceIndexer {
         let pipeline_re = Regex::new(r#"https?://[^\s"\\)]*?/_build/results\?buildId=(\d+)[^\s"\\)]*"#).unwrap();
         let pr_id_re = Regex::new(r#""pullRequestId"\s*:\s*(\d+)"#).unwrap();
         let wi_id_re = Regex::new(r#""workItemId"\s*:\s*(\d+)"#).unwrap();
+        let pr_repo_re = Regex::new(r"_git/([^/]+)/pullrequest").unwrap();
 
         for line in reader.lines().flatten() {
             // PR URLs
             for cap in pr_url_re.captures_iter(&line) {
                 let pr_id = cap[1].to_string();
                 let url = cap[0].trim_end_matches(&['"', ')', '}', ']', '\\'][..]).to_string();
-                let repo_match = Regex::new(r"_git/([^/]+)/pullrequest").ok()
-                    .and_then(|re| re.captures(&url))
+                let repo_match = pr_repo_re.captures(&url)
                     .map(|c| c[1].to_string());
                 prs.entry(pr_id.clone()).or_insert(Resource {
                     resource_type: "pr".to_string(),
@@ -234,10 +234,9 @@ impl ResourceIndexer {
         let mut resources: Vec<Resource> = Vec::new();
         resources.extend(prs.into_values());
         resources.extend(work_items.into_values());
+        let repo_name_re = Regex::new(r"_git/(.+)").unwrap();
         for url in repos {
-            let name = Regex::new(r"_git/(.+)")
-                .ok()
-                .and_then(|re| re.captures(&url))
+            let name = repo_name_re.captures(&url)
                 .map(|c| c[1].to_string())
                 .unwrap_or_else(|| url.clone());
             resources.push(Resource {
