@@ -2,6 +2,11 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.6.7] - 2026-04-03
+
+### Fixed
+- **Tauri auto-update fully working** — signing key, password, and `createUpdaterArtifacts` all configured correctly
+
 ## [0.6.6] - 2026-04-02
 
 ### Fixed
