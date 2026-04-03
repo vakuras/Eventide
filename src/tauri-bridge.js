@@ -143,10 +143,19 @@ window.api = {
   },
   installUpdate: async () => {
     try {
+      // Kill all active PTY sessions to release pty_host.exe
+      try {
+        const active = await invoke('get_active_sessions');
+        for (const id of active) {
+          await invoke('kill_pty', { sessionId: id }).catch(() => {});
+        }
+        // Brief delay for processes to exit
+        await new Promise(r => setTimeout(r, 500));
+      } catch {}
+
       const update = window._tauriPendingUpdate;
       if (update) {
         if (window._tauriUpdateDownloaded) {
-          // Already downloaded — just install (restarts app)
           await update.install();
         } else {
           await update.downloadAndInstall();
