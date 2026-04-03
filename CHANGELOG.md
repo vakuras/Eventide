@@ -2,6 +2,18 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.7.0] - 2026-04-03
+
+### Fixed
+- **Sidebar collapse restore** — sidebar now correctly restores to collapsed state on startup
+- **PTY input delay** — reverted timer-based batching that caused characters to buffer
+- **Update install** — kills PTY sessions before installing to prevent file-in-use errors
+- **Update banner** — polished green card with "Restart to update" button
+
+### Changed
+- **Code quality** — moved regex out of hot loops, replaced panicking unwraps, removed dead code
+- **Removed unused Job Object code** — simplified PTY lifecycle
+
 ## [0.6.8] - 2026-04-03
 
 ### Fixed

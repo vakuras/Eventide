@@ -594,8 +594,8 @@ async function init() {
   autoUpdateToggle.checked = settings.autoUpdateEnabled !== false;
   lastExpandedSidebarWidth = settings.sidebarWidth || 280;
   lastDiffPanelWidth = settings.diffPanelWidth || 500;
-  sidebarHidden = !!settings.sidebarCollapsed;
-  sidebarCollapsed = false;
+  sidebarCollapsed = !!settings.sidebarCollapsed;
+  sidebarHidden = false;
   syncSidebarCollapsedUi();
   applyTheme(settings.theme || 'midnight');
   updatePanelButtonState();
