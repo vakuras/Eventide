@@ -937,7 +937,11 @@ function handleUpdateStatus(data) {
       progressBar.style.width = `${data.progress?.percent || 0}%`;
       break;
     case 'downloaded':
-      statusEl.innerHTML = `v${data.info?.version} ready — <button id="btn-restart-update" class="btn-link" style="color:var(--accent);cursor:pointer">Restart to update</button>`;
+      statusEl.innerHTML = `
+        <div class="update-ready">
+          <span class="update-ready-text">v${data.info?.version} is ready to install</span>
+          <button id="btn-restart-update" class="btn-update-restart">Restart to update</button>
+        </div>`;
       statusEl.className = 'update-status update-available';
       const restartBtn = document.getElementById('btn-restart-update');
       if (restartBtn) {
