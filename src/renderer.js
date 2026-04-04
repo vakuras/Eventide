@@ -1174,29 +1174,6 @@ function createSessionItem(session, group, index) {
   el.setAttribute('role', 'button');
   el.title = sidebarCollapsed ? '' : session.title;
 
-  // Collapsed sidebar: show flyout popup on hover
-  el.addEventListener('mouseenter', () => {
-    if (!sidebarCollapsed) return;
-    const flyout = document.getElementById('session-flyout');
-    // Clone the expanded content (header, meta, tags) into the flyout
-    const headerRow = el.querySelector('.session-header-row');
-    const meta = el.querySelector('.session-meta');
-    const tags = el.querySelector('.session-tags');
-    flyout.innerHTML = '';
-    if (headerRow) flyout.appendChild(headerRow.cloneNode(true));
-    if (meta) flyout.appendChild(meta.cloneNode(true));
-    if (tags) flyout.appendChild(tags.cloneNode(true));
-    // Position to the right of the sidebar
-    const rect = el.getBoundingClientRect();
-    const sidebarRect = sidebar.getBoundingClientRect();
-    flyout.style.left = (sidebarRect.right + 4) + 'px';
-    flyout.style.top = Math.max(36, rect.top) + 'px';
-    flyout.classList.remove('hidden');
-  });
-  el.addEventListener('mouseleave', () => {
-    document.getElementById('session-flyout').classList.add('hidden');
-  });
-
   // Drag-and-drop + context menu for active sessions
   if (currentSidebarTab === 'active') {
     el.setAttribute('draggable', 'true');

@@ -248,6 +248,7 @@ body {
 #sidebar.collapsed {
   width: 48px !important;
   min-width: 48px;
+  overflow: visible;
 }
 
 #sidebar.collapsed #sidebar-tabs {
@@ -522,7 +523,7 @@ body {
   transform: translateY(-50%);
   background: var(--bg-surface);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   border-radius: 8px;
   padding: 10px 14px;
   z-index: 1000;
@@ -535,7 +536,6 @@ body {
 .session-collapsed-index:hover .session-popup-tip {
   display: block;
 }
-.session-popup-tip .session-state { font-size: 9px; }
 
 .session-item:hover {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
@@ -1218,6 +1218,7 @@ body {
 
 #sidebar.collapsed #session-list {
   padding: 6px 0;
+  overflow: visible;
 }
 
 #sidebar.collapsed .session-item {
