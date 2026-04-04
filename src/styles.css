@@ -1002,6 +1002,29 @@ body {
   display: block;
 }
 
+/* Session flyout popup (collapsed sidebar hover) */
+.session-flyout {
+  position: fixed;
+  z-index: 500;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 220px;
+  max-width: 300px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.session-flyout.hidden { display: none; }
+.session-flyout .session-header-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.session-flyout .session-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-flyout .session-state { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+.session-flyout .session-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; display: flex; gap: 8px; }
+.session-flyout .session-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.session-flyout .tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--bg-overlay); color: var(--text-dim); }
+.session-flyout .session-delete,
+.session-flyout .session-close { display: none; }
+
 /* Session info bar — always visible below the terminal */
 .terminal-prompt-ghost {
   display: flex;

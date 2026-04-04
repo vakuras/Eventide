@@ -1150,8 +1150,16 @@ function createSessionItem(session, group, index) {
     cwdHtml = `<span class="session-cwd" role="button" tabindex="0" data-session-id="${session.id}" title="${escapeHtml(session.cwd)}">📂 ${escapeHtml(cwdDisplay)}</span>`;
   }
 
+  const collapsedChar = (session.title || '?').charAt(0).toUpperCase();
+  const tipParts = [session.title];
+  if (stateLabel) tipParts.push(`Status: ${stateTip}`);
+  tipParts.push(`Time: ${timeStr}`);
+  if (session.cwd) tipParts.push(`📂 ${session.cwd}`);
+  if (session.tags && session.tags.length > 0) tipParts.push(`Tags: ${session.tags.join(', ')}`);
+  const collapsedTip = tipParts.join('\n');
+
   el.innerHTML = `
-    <div class="session-collapsed-index" title="${escapeHtml(`Session ${index + 1}`)}">${index + 1}</div>
+    <div class="session-collapsed-index" title="${escapeHtml(collapsedTip)}">${escapeHtml(collapsedChar)}</div>
     <div class="session-header-row">
       <div class="session-title" data-title="${escapeHtml(session.title)}">${escapeHtml(session.title)}</div>
       <span class="session-state ${stateCls}" title="${escapeHtml(stateTip)}">${stateLabel}</span>
@@ -1164,7 +1172,30 @@ function createSessionItem(session, group, index) {
 
   el.setAttribute('tabindex', '0');
   el.setAttribute('role', 'button');
-  el.title = session.title;
+  el.title = sidebarCollapsed ? '' : session.title;
+
+  // Collapsed sidebar: show flyout popup on hover
+  el.addEventListener('mouseenter', () => {
+    if (!sidebarCollapsed) return;
+    const flyout = document.getElementById('session-flyout');
+    // Clone the expanded content (header, meta, tags) into the flyout
+    const headerRow = el.querySelector('.session-header-row');
+    const meta = el.querySelector('.session-meta');
+    const tags = el.querySelector('.session-tags');
+    flyout.innerHTML = '';
+    if (headerRow) flyout.appendChild(headerRow.cloneNode(true));
+    if (meta) flyout.appendChild(meta.cloneNode(true));
+    if (tags) flyout.appendChild(tags.cloneNode(true));
+    // Position to the right of the sidebar
+    const rect = el.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+    flyout.style.left = (sidebarRect.right + 4) + 'px';
+    flyout.style.top = Math.max(36, rect.top) + 'px';
+    flyout.classList.remove('hidden');
+  });
+  el.addEventListener('mouseleave', () => {
+    document.getElementById('session-flyout').classList.add('hidden');
+  });
 
   // Drag-and-drop + context menu for active sessions
   if (currentSidebarTab === 'active') {
