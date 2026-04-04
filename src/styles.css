@@ -521,6 +521,7 @@ body {
   top: 50%;
   transform: translateY(-50%);
   background: var(--bg-surface);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
@@ -534,31 +535,7 @@ body {
 .session-collapsed-index:hover .session-popup-tip {
   display: block;
 }
-.session-popup-tip .session-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.session-popup-tip .session-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-.session-popup-tip .session-meta {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-bottom: 4px;
-}
-.session-popup-tip .session-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
+.session-popup-tip .session-state { font-size: 9px; }
 
 .session-item:hover {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
