@@ -1151,15 +1151,22 @@ function createSessionItem(session, group, index) {
   }
 
   const collapsedChar = (session.title || '?').charAt(0).toUpperCase();
-  const tipParts = [session.title];
-  if (stateLabel) tipParts.push(`Status: ${stateTip}`);
-  tipParts.push(`Time: ${timeStr}`);
-  if (session.cwd) tipParts.push(`📂 ${session.cwd}`);
-  if (session.tags && session.tags.length > 0) tipParts.push(`Tags: ${session.tags.join(', ')}`);
-  const collapsedTip = tipParts.join('\n');
+  const collapsedTagsHtml = (session.tags || []).slice(0, 3).map(t =>
+    `<span class="session-tag">${escapeHtml(t)}</span>`
+  ).join('') + ((session.tags || []).length > 3 ? `<span class="session-tag-overflow">+${session.tags.length - 3}</span>` : '');
+  const collapsedCwdHtml = session.cwd ? `<span class="session-cwd">📂 ${escapeHtml(shortenPath(session.cwd))}</span>` : '';
 
   el.innerHTML = `
-    <div class="session-collapsed-index" title="${escapeHtml(collapsedTip)}">${escapeHtml(collapsedChar)}</div>
+    <div class="session-collapsed-index">${escapeHtml(collapsedChar)}
+      <div class="session-popup-tip">
+        <div class="session-header-row">
+          <div class="session-title">${escapeHtml(session.title)}</div>
+          <span class="session-state ${stateCls}">${stateLabel}</span>
+        </div>
+        <div class="session-meta"><span>${timeStr}</span>${collapsedCwdHtml}</div>
+        ${collapsedTagsHtml ? `<div class="session-tags">${collapsedTagsHtml}</div>` : ''}
+      </div>
+    </div>
     <div class="session-header-row">
       <div class="session-title" data-title="${escapeHtml(session.title)}">${escapeHtml(session.title)}</div>
       <span class="session-state ${stateCls}" title="${escapeHtml(stateTip)}">${stateLabel}</span>
