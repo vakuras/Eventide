@@ -1723,6 +1723,13 @@ function switchToSession(sessionId) {
 
     updateStatusPanel(sessionId);
     updateDiffPanel(sessionId);
+    
+    // Highlight both tabs that are in the split
+    document.querySelectorAll('.tab').forEach(tab => {
+      const id = tab.dataset.sessionId;
+      tab.classList.toggle('active', id === activeSessionId || id === sessionId);
+    });
+    
     saveTabState();
     return;
   }
@@ -1731,6 +1738,25 @@ function switchToSession(sessionId) {
   if (splitActive) {
     const wrapper = splitContainer.querySelector('.terminal-wrapper');
     if (wrapper) { wrapper.classList.remove('visible'); terminalContainer.appendChild(wrapper); }
+    
+    // Unmerge any split tab back to single tabs
+    const splitTab = document.querySelector('.tab[data-session-ids]');
+    if (splitTab) {
+      const [leftId, rightId] = splitTab.dataset.sessionIds.split(',');
+      const leftSession = allSessions.find(s => s.id === leftId);
+      const rightSession = allSessions.find(s => s.id === rightId);
+      const insertRef = splitTab.nextSibling;
+      splitTab.remove();
+      addTab(leftId, leftSession?.title || leftId.substring(0, 8));
+      addTab(rightId, rightSession?.title || rightId.substring(0, 8));
+      const newLeft = document.querySelector(`.tab[data-session-id="${leftId}"]`);
+      const newRight = document.querySelector(`.tab[data-session-id="${rightId}"]`);
+      if (insertRef && newLeft && newRight) {
+        tabsScrollArea.insertBefore(newRight, insertRef);
+        tabsScrollArea.insertBefore(newLeft, newRight);
+      }
+    }
+    
     splitActive = false;
     splitSessionId = null;
     splitFocusRight = false;
@@ -1863,7 +1889,7 @@ function addTab(sessionId, title) {
   updateTabScrollButtons();
 }
 
-function addSplitTab(leftId, leftTitle, rightId, rightTitle) {
+function addSplitTab(leftId, leftTitle, rightId, rightTitle, insertBefore) {
   if (document.querySelector(`.tab[data-session-ids="${leftId},${rightId}"]`)) return;
 
   const tab = document.createElement('div');
@@ -1917,7 +1943,11 @@ function addSplitTab(leftId, leftTitle, rightId, rightTitle) {
     switchToSplitPage(leftId, rightId);
   });
 
-  tabsScrollArea.appendChild(tab);
+  if (insertBefore) {
+    tabsScrollArea.insertBefore(tab, insertBefore);
+  } else {
+    tabsScrollArea.appendChild(tab);
+  }
   updateTabScrollButtons();
 }
 
@@ -2027,6 +2057,12 @@ function updateTabScrollButtons() {
   const overflows = el.scrollWidth > el.clientWidth;
   tabScrollLeft.classList.toggle('visible', overflows && el.scrollLeft > 0);
   tabScrollRight.classList.toggle('visible', overflows && el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  // Disable split button if fewer than 2 single tabs (and not already in a split tab)
+  if (btnSplit) {
+    const singleTabs = tabsScrollArea.querySelectorAll('.tab[data-session-id]').length;
+    const hasSplitTab = !!tabsScrollArea.querySelector('.tab[data-session-ids]');
+    btnSplit.disabled = singleTabs < 2 && !hasSplitTab;
+  }
 }
 
 async function closeTab(sessionId) {
@@ -2975,28 +3011,31 @@ diffPanel.addEventListener('mouseleave', () => {
 
 // ── Split View ──────────────────────────────────────────
 function toggleSplit() {
-  const currentTab = document.querySelector('.tab.active');
+  // Find the active tab
+  let currentTab = document.querySelector(`.tab[data-session-id="${activeSessionId}"]`);
+  if (!currentTab) {
+    currentTab = document.querySelector('.tab[data-session-ids].active');
+  }
   if (!currentTab) return;
 
   const sessionIds = currentTab.dataset.sessionIds;
 
   if (sessionIds) {
-    // Currently viewing a split tab → UNMERGE
+    // Currently viewing a split tab → UNMERGE into two single tabs
     const [leftId, rightId] = sessionIds.split(',');
     const leftSession = allSessions.find(s => s.id === leftId);
     const rightSession = allSessions.find(s => s.id === rightId);
 
-    // Remove the split tab
+    // Remember position, then remove
+    const unmergeInsertBefore = currentTab.nextSibling;
     currentTab.remove();
 
-    // Move right pane wrapper back to terminal container
     const rightWrapper = splitContainer.querySelector('.terminal-wrapper');
     if (rightWrapper) {
       rightWrapper.classList.remove('visible');
       terminalContainer.appendChild(rightWrapper);
     }
 
-    // Hide split pane
     splitActive = false;
     splitSessionId = null;
     splitFocusRight = false;
@@ -3006,52 +3045,50 @@ function toggleSplit() {
     btnSplit.classList.remove('active');
     splitEmpty.style.display = '';
 
-    // Add two separate tabs
+    // Insert two tabs at the original position
     addTab(leftId, leftSession?.title || leftId.substring(0, 8));
     addTab(rightId, rightSession?.title || rightId.substring(0, 8));
-
-    // Switch to the left one
+    // Move them to the original position
+    const newLeftTab = document.querySelector(`.tab[data-session-id="${leftId}"]`);
+    const newRightTab = document.querySelector(`.tab[data-session-id="${rightId}"]`);
+    if (unmergeInsertBefore && newLeftTab && newRightTab) {
+      tabsScrollArea.insertBefore(newRightTab, unmergeInsertBefore);
+      tabsScrollArea.insertBefore(newLeftTab, newRightTab);
+    }
+    updateTabScrollButtons();
     switchToSession(leftId);
   } else {
-    // Currently viewing a single tab
-    if (splitActive && splitSessionId) {
-      // Split is open with a session → MERGE into one split tab
-      const leftId = activeSessionId;
-      const rightId = splitSessionId;
-      const leftSession = allSessions.find(s => s.id === leftId);
-      const rightSession = allSessions.find(s => s.id === rightId);
+    // Currently viewing a single tab → MERGE with the next tab
+    const allTabs = [...tabsScrollArea.querySelectorAll('.tab[data-session-id]')];
+    const currentIndex = allTabs.indexOf(currentTab);
+    const nextTab = allTabs[currentIndex + 1] || allTabs[currentIndex - 1];
 
-      // Remove both individual tabs
-      document.querySelector(`.tab[data-session-id="${leftId}"]`)?.remove();
-      document.querySelector(`.tab[data-session-id="${rightId}"]`)?.remove();
+    if (!nextTab) return; // Only one tab, can't merge
 
-      // Create the merged split tab
-      addSplitTab(leftId, leftSession?.title || leftId.substring(0, 8),
-                  rightId, rightSession?.title || rightId.substring(0, 8));
+    const leftId = currentTab.dataset.sessionId;
+    const rightId = nextTab.dataset.sessionId;
 
-      btnSplit.classList.add('active');
-      saveTabState();
-    } else {
-      // No split open → just open/close the split pane (empty right side)
-      splitActive = !splitActive;
-      splitPane.classList.toggle('hidden', !splitActive);
-      btnSplit.classList.toggle('active', splitActive);
+    // Both sessions must have active terminals
+    if (!terminals.has(leftId) || !terminals.has(rightId)) return;
 
-      if (!splitActive) {
-        const wrapper = splitContainer.querySelector('.terminal-wrapper');
-        if (wrapper) {
-          wrapper.classList.remove('visible');
-          terminalContainer.appendChild(wrapper);
-        }
-        splitSessionId = null;
-        splitFocusRight = false;
-        splitEmpty.style.display = '';
-        splitPane.classList.remove('focused');
-        terminalColumn.classList.remove('focused');
-      }
+    const leftSession = allSessions.find(s => s.id === leftId);
+    const rightSession = allSessions.find(s => s.id === rightId);
 
-      requestAnimationFrame(() => fitActiveTerminal());
-    }
+    // Remember position — insert after both removed tabs
+    const insertBefore = nextTab.nextSibling;
+
+    // Remove both individual tabs
+    currentTab.remove();
+    nextTab.remove();
+
+    // Create the merged split tab at the original position
+    addSplitTab(leftId, leftSession?.title || leftId.substring(0, 8),
+                rightId, rightSession?.title || rightId.substring(0, 8), insertBefore);
+
+    // Show split view with both sessions
+    switchToSplitPage(leftId, rightId);
+    btnSplit.classList.add('active');
+    saveTabState();
   }
 }
 

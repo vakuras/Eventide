@@ -1070,6 +1070,17 @@ body {
   color: var(--accent);
   border-color: var(--accent);
 }
+#btn-split {
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#btn-split:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
 
 /* Session flyout popup (collapsed sidebar hover) */
 .session-flyout {
