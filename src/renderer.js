@@ -1145,6 +1145,42 @@ function scheduleRenderSessionList() {
   });
 }
 
+function createMergedSessionItem(leftSession, rightSession, index) {
+  const el = document.createElement('div');
+  el.className = 'session-item session-merged';
+  el.dataset.sessionIds = `${leftSession.id},${rightSession?.id || ''}`;
+  if (leftSession.id === activeSessionId || rightSession?.id === activeSessionId ||
+      leftSession.id === splitSessionId || rightSession?.id === splitSessionId) {
+    el.classList.add('active');
+  }
+  if (sessionAliveState.has(leftSession.id)) el.classList.add('running');
+
+  const leftTitle = leftSession.title || leftSession.id.substring(0, 8);
+  const rightTitle = rightSession?.title || rightSession?.id?.substring(0, 8) || '?';
+  const truncate = (t, max) => t.length > max ? t.substring(0, max - 1) + '…' : t;
+
+  el.innerHTML = `
+    <div class="session-collapsed-index">${(leftTitle.charAt(0) + rightTitle.charAt(0)).toUpperCase()}
+      <div class="session-popup-tip">
+        <div class="session-header-row">
+          <div class="session-title">${escapeHtml(leftTitle)} + ${escapeHtml(rightTitle)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="session-header-row">
+      <div class="session-title">${escapeHtml(truncate(leftTitle, 15))} + ${escapeHtml(truncate(rightTitle, 15))}</div>
+    </div>
+  `;
+
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('role', 'button');
+  el.addEventListener('click', () => {
+    switchToSplitPage(leftSession.id, rightSession?.id);
+  });
+
+  return el;
+}
+
 function createSessionItem(session, group, index) {
   const el = document.createElement('div');
   el.className = 'session-item';
@@ -1278,18 +1314,21 @@ function renderSessionList() {
   let displayed;
   if (currentSidebarTab === 'active') {
     displayed = allSessions.filter(s => activeIds.has(s.id));
-    // Use manual order if available, fall back to last-used sort
-    if (sessionOrder.length > 0) {
-      const orderMap = new Map(sessionOrder.map((id, i) => [id, i]));
-      displayed.sort((a, b) => {
-        const oa = orderMap.has(a.id) ? orderMap.get(a.id) : 99999;
-        const ob = orderMap.has(b.id) ? orderMap.get(b.id) : 99999;
-        if (oa !== ob) return oa - ob;
-        return (sessionLastUsed.get(b.id) || 0) - (sessionLastUsed.get(a.id) || 0);
-      });
-    } else {
-      displayed.sort((a, b) => (sessionLastUsed.get(b.id) || 0) - (sessionLastUsed.get(a.id) || 0));
-    }
+    // Sort by tab bar order
+    const tabOrder = new Map();
+    let idx = 0;
+    tabsScrollArea.querySelectorAll('.tab').forEach(tab => {
+      if (tab.dataset.sessionId) {
+        tabOrder.set(tab.dataset.sessionId, idx++);
+      } else if (tab.dataset.sessionIds) {
+        tab.dataset.sessionIds.split(',').forEach(id => tabOrder.set(id, idx++));
+      }
+    });
+    displayed.sort((a, b) => {
+      const oa = tabOrder.has(a.id) ? tabOrder.get(a.id) : 99999;
+      const ob = tabOrder.has(b.id) ? tabOrder.get(b.id) : 99999;
+      return oa - ob;
+    });
   } else {
     displayed = [...allSessions];
     displayed.sort((a, b) => (sessionLastUsed.get(b.id) || 0) - (sessionLastUsed.get(a.id) || 0));
@@ -1306,6 +1345,15 @@ function renderSessionList() {
   }
 
   sessionList.innerHTML = '';
+
+  // Detect merged sessions from split tabs
+  const mergedPairs = new Map(); // leftId → rightId
+  const mergedRightIds = new Set();
+  tabsScrollArea.querySelectorAll('.tab[data-session-ids]').forEach(tab => {
+    const [leftId, rightId] = tab.dataset.sessionIds.split(',');
+    mergedPairs.set(leftId, rightId);
+    mergedRightIds.add(rightId);
+  });
 
   if (displayed.length === 0) {
     const emptyEl = document.createElement('div');
@@ -1399,12 +1447,33 @@ function renderSessionList() {
     const groupedIds = new Set(tabGroups.flatMap(g => g.tabIds));
     const ungrouped = displayed.filter(s => !groupedIds.has(s.id));
     for (const session of ungrouped) {
-      appendSessionItem(session);
+      if (mergedRightIds.has(session.id)) continue;
+      if (mergedPairs.has(session.id)) {
+        const rightId = mergedPairs.get(session.id);
+        const rightSession = allSessions.find(s => s.id === rightId);
+        const el = createMergedSessionItem(session, rightSession, displayIndex);
+        displayIndex += 1;
+        sessionList.appendChild(el);
+      } else {
+        appendSessionItem(session);
+      }
     }
   } else {
-    // Original rendering (history tab or search active)
+    // Original rendering (history tab or search active or no groups)
     for (const session of displayed) {
-      appendSessionItem(session);
+      // Skip the right half of a merged pair (shown as part of left)
+      if (mergedRightIds.has(session.id)) continue;
+
+      if (mergedPairs.has(session.id)) {
+        // Render as a merged item
+        const rightId = mergedPairs.get(session.id);
+        const rightSession = allSessions.find(s => s.id === rightId);
+        const el = createMergedSessionItem(session, rightSession, displayIndex);
+        displayIndex += 1;
+        sessionList.appendChild(el);
+      } else {
+        appendSessionItem(session);
+      }
     }
   }
 
@@ -3059,11 +3128,13 @@ function toggleSplit() {
     switchToSession(leftId);
   } else {
     // Currently viewing a single tab → MERGE with the next tab
-    const allTabs = [...tabsScrollArea.querySelectorAll('.tab[data-session-id]')];
-    const currentIndex = allTabs.indexOf(currentTab);
-    const nextTab = allTabs[currentIndex + 1] || allTabs[currentIndex - 1];
-
-    if (!nextTab) return; // Only one tab, can't merge
+    const allSingleTabs = [...tabsScrollArea.querySelectorAll('.tab[data-session-id]')];
+    if (allSingleTabs.length < 2) return; // Need at least 2 tabs to merge
+    
+    const currentIndex = allSingleTabs.indexOf(currentTab);
+    if (currentIndex < 0) return; // Current tab not found in single tabs
+    
+    const nextTab = allSingleTabs[currentIndex + 1] || allSingleTabs[currentIndex - 1];
 
     const leftId = currentTab.dataset.sessionId;
     const rightId = nextTab.dataset.sessionId;
