@@ -14,6 +14,20 @@ All notable changes to Eventide are documented here.
 - **Code quality** — moved regex out of hot loops, replaced panicking unwraps, removed dead code
 - **Removed unused Job Object code** — simplified PTY lifecycle
 
+## [0.6.9] - 2026-04-05
+
+### Added
+- **Collapsed sidebar popup tooltip** — hover shows styled session info (title, status, time, cwd, tags)
+- **First-letter session icons** in collapsed sidebar (instead of numbers)
+- **Polished update-ready banner** with green accent button
+
+### Fixed
+- **Sidebar restores collapsed state** on startup correctly
+- **PTY input delay** reverted timer-based batching that buffered characters
+- **UTF-8 emoji crash** in session titles (6 byte-slicing panics fixed)
+- **Code quality** — regex out of loops, unwraps replaced with proper error handling
+- **Kill PTY sessions** before update install to prevent file-in-use errors
+
 ## [0.6.8] - 2026-04-03
 
 ### Fixed

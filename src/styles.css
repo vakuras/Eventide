@@ -175,7 +175,7 @@ body {
   color: #fff;
 }
 
-#btn-notifications, #btn-instructions, #btn-settings, #btn-toggle-diff, #btn-toggle-status, #btn-split {
+#btn-notifications, #btn-instructions, #btn-settings, #btn-toggle-diff, #btn-toggle-status {
   -webkit-app-region: no-drag;
   app-region: no-drag;
   background: none;
@@ -188,7 +188,7 @@ body {
   transition: all 0.15s;
 }
 
-#btn-notifications:hover, #btn-instructions:hover, #btn-settings:hover, #btn-toggle-diff:hover, #btn-toggle-status:hover, #btn-split:hover {
+#btn-notifications:hover, #btn-instructions:hover, #btn-settings:hover, #btn-toggle-diff:hover, #btn-toggle-status:hover {
   color: var(--text);
   border-color: var(--accent);
 }
@@ -999,6 +999,15 @@ body {
   overflow: hidden;
 }
 
+#terminal-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
 #terminal-container {
   flex: 1;
   min-width: 0;
@@ -1015,71 +1024,6 @@ body {
 
 .terminal-wrapper.visible {
   display: block;
-}
-
-/* Split view */
-#split-pane {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-left: 1px solid var(--border);
-  position: relative;
-  border: 2px solid transparent;
-}
-#split-pane.hidden {
-  display: none;
-}
-#split-pane.focused {
-  border-color: var(--accent);
-}
-#terminal-column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  border: 2px solid transparent;
-}
-#terminal-column.focused {
-  border-color: var(--accent);
-}
-#split-container {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-#split-container .terminal-wrapper {
-  display: block;
-  position: absolute;
-  inset: 0;
-  padding: 4px;
-}
-.split-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dimmer);
-  font-size: 12px;
-}
-#btn-split.active {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-#btn-split {
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-#btn-split:disabled {
-  opacity: 0.3;
-  cursor: default;
-  pointer-events: none;
 }
 
 /* Session flyout popup (collapsed sidebar hover) */
