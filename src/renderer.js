@@ -60,7 +60,14 @@ const GROUP_COLORS = [
 let nextGroupColorIdx = 0;
 
 function saveTabState() {
-  const openTabs = [...terminals.keys()];
+  const openTabs = [];
+  tabsScrollArea.querySelectorAll('.tab').forEach(tab => {
+    if (tab.dataset.sessionIds) {
+      openTabs.push(tab.dataset.sessionIds.split(','));
+    } else if (tab.dataset.sessionId) {
+      openTabs.push(tab.dataset.sessionId);
+    }
+  });
   window.api.updateSettings({ openTabs, activeTab: activeSessionId, tabGroups, sessionOrder });
 }
 
@@ -653,6 +660,11 @@ async function init() {
           terminals.delete(sessionId);
           const tab = document.querySelector(`.tab[data-session-id="${sessionId}"]`);
           if (tab) tab.remove();
+          // Handle split tabs containing this session
+          tabsScrollArea.querySelectorAll('.tab[data-session-ids]').forEach(st => {
+            const ids = st.dataset.sessionIds.split(',');
+            if (ids.includes(sessionId)) st.remove();
+          });
           updateTabScrollButtons();
           if (activeSessionId === sessionId) {
             activeSessionId = null;
@@ -690,6 +702,11 @@ async function init() {
     }
     const tab = document.querySelector(`.tab[data-session-id="${sessionId}"]`);
     if (tab) tab.remove();
+    // Handle split tabs containing this session
+    tabsScrollArea.querySelectorAll('.tab[data-session-ids]').forEach(st => {
+      const ids = st.dataset.sessionIds.split(',');
+      if (ids.includes(sessionId)) st.remove();
+    });
     updateTabScrollButtons();
     if (activeSessionId === sessionId) {
       activeSessionId = null;
@@ -848,8 +865,34 @@ async function init() {
   // Restore previously open tabs
   if (settings.openTabs && settings.openTabs.length > 0) {
     const validIds = new Set(allSessions.map(s => s.id));
-    const tabsToRestore = settings.openTabs.filter(id => validIds.has(id));
-    await Promise.allSettled(tabsToRestore.map(id => openSession(id)));
+    // Collect all session IDs from both single entries and split pairs
+    const allTabIds = [];
+    for (const entry of settings.openTabs) {
+      if (Array.isArray(entry)) {
+        for (const id of entry) { if (validIds.has(id)) allTabIds.push(id); }
+      } else if (validIds.has(entry)) {
+        allTabIds.push(entry);
+      }
+    }
+    const uniqueIds = [...new Set(allTabIds)];
+    await Promise.allSettled(uniqueIds.map(id => openSession(id)));
+
+    // Now rebuild tabs in order: remove auto-created tabs and re-add in saved order
+    tabsScrollArea.querySelectorAll('.tab').forEach(t => t.remove());
+    for (const entry of settings.openTabs) {
+      if (Array.isArray(entry)) {
+        const [leftId, rightId] = entry;
+        if (terminals.has(leftId) && terminals.has(rightId)) {
+          const leftSession = allSessions.find(s => s.id === leftId);
+          const rightSession = allSessions.find(s => s.id === rightId);
+          addSplitTab(leftId, leftSession?.title || leftId.substring(0, 8),
+                      rightId, rightSession?.title || rightId.substring(0, 8));
+        }
+      } else if (terminals.has(entry)) {
+        const session = allSessions.find(s => s.id === entry);
+        addTab(entry, session?.title || entry.substring(0, 8));
+      }
+    }
 
     // Restore tab groups (with validation)
     if (Array.isArray(settings.tabGroups) && settings.tabGroups.length > 0) {
@@ -1684,6 +1727,20 @@ function switchToSession(sessionId) {
     return;
   }
 
+  // If switching to a single session, close split view
+  if (splitActive) {
+    const wrapper = splitContainer.querySelector('.terminal-wrapper');
+    if (wrapper) { wrapper.classList.remove('visible'); terminalContainer.appendChild(wrapper); }
+    splitActive = false;
+    splitSessionId = null;
+    splitFocusRight = false;
+    splitPane.classList.add('hidden');
+    splitPane.classList.remove('focused');
+    terminalColumn.classList.remove('focused');
+    splitEmpty.style.display = '';
+    btnSplit.classList.remove('active');
+  }
+
   // Normal left-pane behavior
   if (activeSessionId && terminals.has(activeSessionId)) {
     terminals.get(activeSessionId).wrapper.classList.remove('visible');
@@ -1719,7 +1776,11 @@ function switchToSession(sessionId) {
   }
 
   document.querySelectorAll('.tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.sessionId === sessionId);
+    if (tab.dataset.sessionIds) {
+      tab.classList.remove('active');
+    } else {
+      tab.classList.toggle('active', tab.dataset.sessionId === sessionId);
+    }
   });
 
   // Scroll the active tab into view
@@ -1802,6 +1863,119 @@ function addTab(sessionId, title) {
   updateTabScrollButtons();
 }
 
+function addSplitTab(leftId, leftTitle, rightId, rightTitle) {
+  if (document.querySelector(`.tab[data-session-ids="${leftId},${rightId}"]`)) return;
+
+  const tab = document.createElement('div');
+  tab.className = 'tab active';
+  tab.dataset.sessionIds = `${leftId},${rightId}`;
+  tab.setAttribute('tabindex', '0');
+  tab.setAttribute('role', 'tab');
+
+  const truncate = (t, max) => t.length > max ? t.substring(0, max - 1) + '\u2026' : t;
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'tab-title';
+  titleSpan.textContent = `${truncate(leftTitle, 12)} + ${truncate(rightTitle, 12)}`;
+  titleSpan.title = `${leftTitle} + ${rightTitle}`;
+
+  const closeBtn = document.createElement('span');
+  closeBtn.className = 'tab-close';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tab.remove();
+    splitActive = false;
+    const wrapper = splitContainer.querySelector('.terminal-wrapper');
+    if (wrapper) { wrapper.classList.remove('visible'); terminalContainer.appendChild(wrapper); }
+    splitSessionId = null;
+    splitPane.classList.add('hidden');
+    btnSplit.classList.remove('active');
+    const remaining = document.querySelectorAll('.tab');
+    if (remaining.length > 0) {
+      const nextTab = remaining[remaining.length - 1];
+      if (nextTab.dataset.sessionIds) {
+        const [l, r] = nextTab.dataset.sessionIds.split(',');
+        switchToSplitPage(l, r);
+      } else {
+        switchToSession(nextTab.dataset.sessionId);
+      }
+    } else {
+      emptyState.classList.remove('hidden');
+      updateStatusPanel(null);
+      updateDiffPanel(null);
+    }
+    saveTabState();
+    updateTabScrollButtons();
+  });
+
+  tab.appendChild(titleSpan);
+  tab.appendChild(closeBtn);
+
+  tab.addEventListener('click', (e) => {
+    if (e.target.closest('.tab-close')) return;
+    switchToSplitPage(leftId, rightId);
+  });
+
+  tabsScrollArea.appendChild(tab);
+  updateTabScrollButtons();
+}
+
+function switchToSplitPage(leftId, rightId) {
+  hideInstructions();
+
+  // Hide current left terminal
+  if (activeSessionId && terminals.has(activeSessionId)) {
+    terminals.get(activeSessionId).wrapper.classList.remove('visible');
+  }
+  // Hide current split terminal
+  const oldSplitWrapper = splitContainer.querySelector('.terminal-wrapper');
+  if (oldSplitWrapper) {
+    oldSplitWrapper.classList.remove('visible');
+    terminalContainer.appendChild(oldSplitWrapper);
+  }
+
+  // Show split pane
+  splitActive = true;
+  splitPane.classList.remove('hidden');
+  btnSplit.classList.add('active');
+  splitEmpty.style.display = 'none';
+
+  // Left pane
+  activeSessionId = leftId;
+  const leftEntry = terminals.get(leftId);
+  if (leftEntry) {
+    leftEntry.wrapper.classList.add('visible');
+    emptyState.classList.add('hidden');
+  }
+
+  // Right pane
+  splitSessionId = rightId;
+  const rightEntry = terminals.get(rightId);
+  if (rightEntry) {
+    splitContainer.appendChild(rightEntry.wrapper);
+    rightEntry.wrapper.classList.add('visible');
+  }
+
+  updatePanelButtonState();
+
+  // Highlight the split tab
+  document.querySelectorAll('.tab').forEach(t => {
+    const ids = t.dataset.sessionIds;
+    const id = t.dataset.sessionId;
+    t.classList.toggle('active', ids === `${leftId},${rightId}` || false);
+    if (id) t.classList.remove('active');
+  });
+
+  requestAnimationFrame(() => {
+    if (leftEntry) { leftEntry.fitAddon.fit(); window.api.resizePty(leftId, leftEntry.terminal.cols, leftEntry.terminal.rows); }
+    if (rightEntry) { rightEntry.fitAddon.fit(); rightEntry.terminal.focus(); window.api.resizePty(rightId, rightEntry.terminal.cols, rightEntry.terminal.rows); }
+  });
+
+  updateStatusPanel(leftId);
+  updateDiffPanel(leftId);
+  saveTabState();
+}
 
 function startTabRename(sessionId, titleEl) {
   const currentTitle = titleEl.title || titleEl.textContent;
@@ -1889,6 +2063,38 @@ async function closeTab(sessionId) {
 
   const tab = document.querySelector(`.tab[data-session-id="${sessionId}"]`);
   if (tab) tab.remove();
+
+  // Also handle split tabs containing this session
+  const splitTab = document.querySelector('.tab[data-session-ids]');
+  if (splitTab) {
+    const ids = splitTab.dataset.sessionIds.split(',');
+    if (ids.includes(sessionId)) {
+      const otherId = ids.find(id => id !== sessionId);
+      splitTab.remove();
+      // Close split view
+      const wrapper = splitContainer.querySelector('.terminal-wrapper');
+      if (wrapper) { wrapper.classList.remove('visible'); terminalContainer.appendChild(wrapper); }
+      splitActive = false;
+      splitSessionId = null;
+      splitFocusRight = false;
+      splitPane.classList.add('hidden');
+      splitPane.classList.remove('focused');
+      terminalColumn.classList.remove('focused');
+      splitEmpty.style.display = '';
+      btnSplit.classList.remove('active');
+      // Re-add the other session as a single tab
+      if (otherId && terminals.has(otherId)) {
+        const otherSession = allSessions.find(s => s.id === otherId);
+        addTab(otherId, otherSession?.title || otherId.substring(0, 8));
+        switchToSession(otherId);
+        updateTabScrollButtons();
+        renderSessionList();
+        saveTabState();
+        return;
+      }
+    }
+  }
+
   updateTabScrollButtons();
 
   if (activeSessionId === sessionId) {
@@ -1897,7 +2103,13 @@ async function closeTab(sessionId) {
     updateSessionPromptGhost(null);
     const remainingTabs = document.querySelectorAll('.tab');
     if (remainingTabs.length > 0) {
-      switchToSession(remainingTabs[remainingTabs.length - 1].dataset.sessionId);
+      const nextTab = remainingTabs[remainingTabs.length - 1];
+      if (nextTab.dataset.sessionIds) {
+        const [l, r] = nextTab.dataset.sessionIds.split(',');
+        switchToSplitPage(l, r);
+      } else {
+        switchToSession(nextTab.dataset.sessionId);
+      }
     } else {
       closeSessionSearch({ restoreTerminalFocus: false });
       emptyState.classList.remove('hidden');
@@ -2763,25 +2975,84 @@ diffPanel.addEventListener('mouseleave', () => {
 
 // ── Split View ──────────────────────────────────────────
 function toggleSplit() {
-  splitActive = !splitActive;
-  splitPane.classList.toggle('hidden', !splitActive);
-  btnSplit.classList.toggle('active', splitActive);
+  const currentTab = document.querySelector('.tab.active');
+  if (!currentTab) return;
 
-  if (!splitActive) {
-    // Unsplit: move wrapper back, create tab if needed
-    const wrapper = splitContainer.querySelector('.terminal-wrapper');
-    if (wrapper) {
-      wrapper.classList.remove('visible');
-      terminalContainer.appendChild(wrapper);
+  const sessionIds = currentTab.dataset.sessionIds;
+
+  if (sessionIds) {
+    // Currently viewing a split tab → UNMERGE
+    const [leftId, rightId] = sessionIds.split(',');
+    const leftSession = allSessions.find(s => s.id === leftId);
+    const rightSession = allSessions.find(s => s.id === rightId);
+
+    // Remove the split tab
+    currentTab.remove();
+
+    // Move right pane wrapper back to terminal container
+    const rightWrapper = splitContainer.querySelector('.terminal-wrapper');
+    if (rightWrapper) {
+      rightWrapper.classList.remove('visible');
+      terminalContainer.appendChild(rightWrapper);
     }
+
+    // Hide split pane
+    splitActive = false;
     splitSessionId = null;
     splitFocusRight = false;
-    splitEmpty.style.display = '';
+    splitPane.classList.add('hidden');
     splitPane.classList.remove('focused');
     terminalColumn.classList.remove('focused');
-  }
+    btnSplit.classList.remove('active');
+    splitEmpty.style.display = '';
 
-  requestAnimationFrame(() => fitActiveTerminal());
+    // Add two separate tabs
+    addTab(leftId, leftSession?.title || leftId.substring(0, 8));
+    addTab(rightId, rightSession?.title || rightId.substring(0, 8));
+
+    // Switch to the left one
+    switchToSession(leftId);
+  } else {
+    // Currently viewing a single tab
+    if (splitActive && splitSessionId) {
+      // Split is open with a session → MERGE into one split tab
+      const leftId = activeSessionId;
+      const rightId = splitSessionId;
+      const leftSession = allSessions.find(s => s.id === leftId);
+      const rightSession = allSessions.find(s => s.id === rightId);
+
+      // Remove both individual tabs
+      document.querySelector(`.tab[data-session-id="${leftId}"]`)?.remove();
+      document.querySelector(`.tab[data-session-id="${rightId}"]`)?.remove();
+
+      // Create the merged split tab
+      addSplitTab(leftId, leftSession?.title || leftId.substring(0, 8),
+                  rightId, rightSession?.title || rightId.substring(0, 8));
+
+      btnSplit.classList.add('active');
+      saveTabState();
+    } else {
+      // No split open → just open/close the split pane (empty right side)
+      splitActive = !splitActive;
+      splitPane.classList.toggle('hidden', !splitActive);
+      btnSplit.classList.toggle('active', splitActive);
+
+      if (!splitActive) {
+        const wrapper = splitContainer.querySelector('.terminal-wrapper');
+        if (wrapper) {
+          wrapper.classList.remove('visible');
+          terminalContainer.appendChild(wrapper);
+        }
+        splitSessionId = null;
+        splitFocusRight = false;
+        splitEmpty.style.display = '';
+        splitPane.classList.remove('focused');
+        terminalColumn.classList.remove('focused');
+      }
+
+      requestAnimationFrame(() => fitActiveTerminal());
+    }
+  }
 }
 
 function setSplitFocus(right) {
@@ -3231,9 +3502,20 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     const tabs = [...document.querySelectorAll('.tab')];
     if (tabs.length < 2) return;
-    const i = tabs.findIndex(t => t.dataset.sessionId === activeSessionId);
+    const i = tabs.findIndex(t => {
+      if (t.dataset.sessionIds) {
+        return t.dataset.sessionIds.split(',').includes(activeSessionId);
+      }
+      return t.dataset.sessionId === activeSessionId;
+    });
     const next = e.shiftKey ? (i - 1 + tabs.length) % tabs.length : (i + 1) % tabs.length;
-    switchToSession(tabs[next].dataset.sessionId);
+    const nextTab = tabs[next];
+    if (nextTab.dataset.sessionIds) {
+      const [l, r] = nextTab.dataset.sessionIds.split(',');
+      switchToSplitPage(l, r);
+    } else {
+      switchToSession(nextTab.dataset.sessionId);
+    }
   }
 
   // Ctrl/Cmd+W: Close current session tab
