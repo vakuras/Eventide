@@ -35,6 +35,9 @@ let lastDiffPanelWidth = 500;
 let diffViewMode = 'unified';
 let currentDiffData = null;
 let currentDiffFile = null;
+let splitActive = false;
+let splitSessionId = null;
+let splitFocusRight = false;
 const sessionPromptGhostState = new Map();
 
 const SIDEBAR_MIN_WIDTH = 180;
@@ -103,6 +106,11 @@ const searchInput = document.getElementById('search');
 const searchClear = document.getElementById('search-clear');
 const sidebarSearchToggle = document.getElementById('sidebar-search-toggle');
 const terminalContainer = document.getElementById('terminal-container');
+const splitPane = document.getElementById('split-pane');
+const splitContainer = document.getElementById('split-container');
+const splitEmpty = document.getElementById('split-empty');
+const btnSplit = document.getElementById('btn-split');
+const terminalColumn = document.getElementById('terminal-column');
 const terminalPromptGhost = document.getElementById('terminal-prompt-ghost');
 const sessionSearch = document.getElementById('session-search');
 const sessionSearchInput = document.getElementById('session-search-input');
@@ -721,6 +729,11 @@ async function init() {
   btnSidebarToggle.addEventListener('click', () => {
     setSidebarCollapsed(!sidebarCollapsed);
   });
+
+  // Split view
+  btnSplit.addEventListener('click', toggleSplit);
+  splitPane.addEventListener('click', () => setSplitFocus(true));
+  terminalColumn.addEventListener('click', () => { if (splitActive) setSplitFocus(false); });
 
   // Settings modal
   btnSettings.addEventListener('click', openSettings);
@@ -1631,6 +1644,47 @@ function createTerminal(sessionId) {
 function switchToSession(sessionId) {
   hideInstructions();
 
+  // If split is active, check if session is already visible in a pane
+  if (splitActive) {
+    if (sessionId === activeSessionId) {
+      setSplitFocus(false);
+      return;
+    }
+    if (sessionId === splitSessionId) {
+      setSplitFocus(true);
+      return;
+    }
+  }
+
+  // Split mode: route to right pane if focused there
+  if (splitActive && splitFocusRight) {
+    // Remove old split terminal wrapper
+    const oldWrapper = splitContainer.querySelector('.terminal-wrapper');
+    if (oldWrapper) {
+      oldWrapper.classList.remove('visible');
+      terminalContainer.appendChild(oldWrapper);
+    }
+
+    const entry = terminals.get(sessionId);
+    if (entry) {
+      splitSessionId = sessionId;
+      splitContainer.appendChild(entry.wrapper);
+      entry.wrapper.classList.add('visible');
+      splitEmpty.style.display = 'none';
+      requestAnimationFrame(() => {
+        entry.fitAddon.fit();
+        entry.terminal.focus();
+        window.api.resizePty(sessionId, entry.terminal.cols, entry.terminal.rows);
+      });
+    }
+
+    updateStatusPanel(sessionId);
+    updateDiffPanel(sessionId);
+    saveTabState();
+    return;
+  }
+
+  // Normal left-pane behavior
   if (activeSessionId && terminals.has(activeSessionId)) {
     terminals.get(activeSessionId).wrapper.classList.remove('visible');
     updateSessionPromptGhost(activeSessionId);
@@ -2707,20 +2761,64 @@ diffPanel.addEventListener('mouseleave', () => {
   if (!isDiffResizing) diffPanel.classList.remove('resize-hover');
 });
 
+// ── Split View ──────────────────────────────────────────
+function toggleSplit() {
+  splitActive = !splitActive;
+  splitPane.classList.toggle('hidden', !splitActive);
+  btnSplit.classList.toggle('active', splitActive);
+
+  if (!splitActive) {
+    // Unsplit: move wrapper back, create tab if needed
+    const wrapper = splitContainer.querySelector('.terminal-wrapper');
+    if (wrapper) {
+      wrapper.classList.remove('visible');
+      terminalContainer.appendChild(wrapper);
+    }
+    splitSessionId = null;
+    splitFocusRight = false;
+    splitEmpty.style.display = '';
+    splitPane.classList.remove('focused');
+    terminalColumn.classList.remove('focused');
+  }
+
+  requestAnimationFrame(() => fitActiveTerminal());
+}
+
+function setSplitFocus(right) {
+  splitFocusRight = right;
+  splitPane.classList.toggle('focused', right);
+  terminalColumn.classList.toggle('focused', !right && splitActive);
+
+  // Focus the terminal in the selected pane
+  const focusId = right ? splitSessionId : activeSessionId;
+  if (focusId && terminals.has(focusId)) {
+    terminals.get(focusId).terminal.focus();
+  }
+
+  // Update status/diff panels for focused session
+  if (focusId) {
+    updateStatusPanel(focusId);
+    updateDiffPanel(focusId);
+  }
+}
+
 function fitActiveTerminal() {
   if (activeSessionId && terminals.has(activeSessionId)) {
     const entry = terminals.get(activeSessionId);
     entry.fitAddon.fit();
     window.api.resizePty(activeSessionId, entry.terminal.cols, entry.terminal.rows);
-    // Force viewport scroll area sync even when fit() is a no-op (same cols/rows).
     syncTerminalViewport(activeSessionId);
-    // Reset any horizontal scroll offset that xterm's viewport may have retained
-    // from a wider column count (e.g. when status panel opens and narrows the container).
     const viewport = entry.terminal.element?.querySelector('.xterm-viewport');
     if (viewport) viewport.scrollLeft = 0;
     const screen = entry.terminal.element?.querySelector('.xterm-screen');
     if (screen) screen.style.width = '';
     scheduleTerminalViewportSync(activeSessionId, { refreshSearch: true });
+  }
+  // Also fit split pane terminal
+  if (splitActive && splitSessionId && terminals.has(splitSessionId)) {
+    const splitEntry = terminals.get(splitSessionId);
+    splitEntry.fitAddon.fit();
+    window.api.resizePty(splitSessionId, splitEntry.terminal.cols, splitEntry.terminal.rows);
   }
 }
 

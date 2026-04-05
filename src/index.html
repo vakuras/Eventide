@@ -13,6 +13,7 @@
   <div id="titlebar">
     <span class="titlebar-text" id="titlebar-home" title="Home">Eventide</span>
     <div class="titlebar-actions">
+      <button id="btn-split" title="Split View">◫</button>
       <button id="btn-toggle-diff" title="Diff View (Ctrl+D)">±</button>
       <button id="btn-toggle-status" title="Session Status (Ctrl+I)">☷</button>
       <button id="btn-notifications" title="Alerts">⚐<span id="notification-badge" class="notification-badge hidden">0</span></button>
@@ -109,9 +110,14 @@
                 </div>
               </div>
             </div>
+            </div><!-- /terminal-column -->
+            <!-- Split pane (right side, hidden by default) -->
+            <div id="split-pane" class="hidden">
+              <div id="split-container"></div>
+              <div id="split-empty" class="split-empty">Click a session to open here</div>
             </div>
-          </div>
-        </div>
+          </div><!-- /terminal-main-row -->
+        </div><!-- /terminal-area -->
 
       <!-- Instructions panel (hidden by default) -->
       <div id="instructions-panel" class="hidden">
