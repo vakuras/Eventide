@@ -48,7 +48,16 @@ fn main() {
     };
 
     let mut cmd = CommandBuilder::new(copilot_path);
-    cmd.args(["--resume", session_id, "--yolo"]);
+    // When using agency, we need the "copilot" subcommand before the flags
+    let binary_name = std::path::Path::new(copilot_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if binary_name == "agency" || binary_name == "agency.exe" {
+        cmd.args(["copilot", "--resume", session_id, "--yolo"]);
+    } else {
+        cmd.args(["--resume", session_id, "--yolo"]);
+    }
     cmd.cwd(cwd);
     cmd.env("TERM", "xterm-256color");
 

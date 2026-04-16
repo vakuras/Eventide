@@ -78,12 +78,13 @@ impl PtyManager {
         use std::process::{Command, Stdio};
 
         let self_exe = std::env::current_exe().map_err(|e| format!("Can't find self exe: {}", e))?;
+        let pty_host_name = if cfg!(target_os = "windows") { "pty_host.exe" } else { "pty_host" };
         let pty_host = self_exe.parent()
             .ok_or_else(|| format!("Executable has no parent directory: {:?}", self_exe))?
-            .join("pty_host.exe");
+            .join(pty_host_name);
 
         if !pty_host.exists() {
-            return Err(format!("pty_host.exe not found at {:?}", pty_host));
+            return Err(format!("{} not found at {:?}", pty_host_name, pty_host));
         }
 
         eprintln!("[eventide] Spawning via pty_host: --resume {} (cwd: {})", session_id, spawn_cwd);
