@@ -26,10 +26,17 @@ class PtyManager extends EventEmitter {
   }
 
   _spawnArgs(extraArgs) {
+    // When the configured binary is `agency`/`agency.exe`, the copilot flags
+    // belong to its `copilot` subcommand, not to agency itself. Without this,
+    // agency rejects `--session-id` with "unexpected argument".
+    const base = require('path').basename(this.copilotPath).toLowerCase();
+    const isAgency = base === 'agency' || base === 'agency.exe';
+    const args = isAgency ? ['copilot', ...extraArgs] : extraArgs;
+
     if (this._useCmd) {
-      return { file: 'cmd.exe', args: ['/c', this.copilotPath, ...extraArgs] };
+      return { file: 'cmd.exe', args: ['/c', this.copilotPath, ...args] };
     }
-    return { file: this.copilotPath, args: extraArgs };
+    return { file: this.copilotPath, args };
   }
 
   get maxConcurrent() {
@@ -53,7 +60,7 @@ class PtyManager extends EventEmitter {
     const spawnCwd = cwd || os.homedir();
     let ptyProcess;
     try {
-      const { file, args } = this._spawnArgs(['--resume', sessionId, '--yolo']);
+      const { file, args } = this._spawnArgs(['--session-id', sessionId, '--yolo']);
       ptyProcess = this._pty.spawn(file, args, {
         name: 'xterm-256color',
         cols: 120,
@@ -65,7 +72,7 @@ class PtyManager extends EventEmitter {
       // If spawn fails with given cwd, retry with homedir
       if (cwd && cwd !== os.homedir()) {
         try {
-          const { file, args } = this._spawnArgs(['--resume', sessionId, '--yolo']);
+          const { file, args } = this._spawnArgs(['--session-id', sessionId, '--yolo']);
           ptyProcess = this._pty.spawn(file, args, {
             name: 'xterm-256color',
             cols: 120,
@@ -128,7 +135,7 @@ class PtyManager extends EventEmitter {
     const spawnCwd = cwd || os.homedir();
     let ptyProcess;
     try {
-      const { file, args } = this._spawnArgs(['--resume', sessionId, '--yolo']);
+      const { file, args } = this._spawnArgs(['--session-id', sessionId, '--yolo']);
       ptyProcess = this._pty.spawn(file, args, {
         name: 'xterm-256color',
         cols: 120,
@@ -139,7 +146,7 @@ class PtyManager extends EventEmitter {
     } catch (err) {
       if (cwd && cwd !== os.homedir()) {
         try {
-          const { file, args } = this._spawnArgs(['--resume', sessionId, '--yolo']);
+          const { file, args } = this._spawnArgs(['--session-id', sessionId, '--yolo']);
           ptyProcess = this._pty.spawn(file, args, {
             name: 'xterm-256color',
             cols: 120,
@@ -224,7 +231,7 @@ class PtyManager extends EventEmitter {
     const sessionId = this._generateId();
     const spawnCwd = cwd || os.homedir();
     try {
-      const { file, args } = this._spawnArgs(['--resume', sessionId, '--yolo']);
+      const { file, args } = this._spawnArgs(['--session-id', sessionId, '--yolo']);
       const ptyProcess = this._pty.spawn(file, args, {
         name: 'xterm-256color',
         cols: 120,

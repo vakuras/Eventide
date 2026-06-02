@@ -265,6 +265,71 @@ describe('PtyManager', () => {
     });
   });
 
+  describe('CLI argument shape', () => {
+    function makeManager(copilotPath) {
+      const settingsService = { get: () => ({ maxConcurrent: 5 }) };
+      return new PtyManager(copilotPath, settingsService, mockPtyModule);
+    }
+
+    it('uses --session-id (not --resume) for new sessions', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('/usr/bin/copilot');
+      const id = mgr.newSession('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args).toEqual(['--session-id', id, '--yolo']);
+    });
+
+    it('uses --session-id (not --resume) for openSession', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('/usr/bin/copilot');
+      mgr.openSession('existing-id', '/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args).toEqual(['--session-id', 'existing-id', '--yolo']);
+    });
+
+    it('uses --session-id for warmUp pre-spawn', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('/usr/bin/copilot');
+      mgr.warmUp('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args[0]).toBe('--session-id');
+      expect(args[2]).toBe('--yolo');
+    });
+
+    it('injects `copilot` subcommand when binary is agency.exe', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('C:\\tools\\agency.exe');
+      const id = mgr.newSession('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args).toEqual(['copilot', '--session-id', id, '--yolo']);
+    });
+
+    it('injects `copilot` subcommand when binary is agency (no extension)', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('/usr/local/bin/agency');
+      const id = mgr.newSession('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args).toEqual(['copilot', '--session-id', id, '--yolo']);
+    });
+
+    it('agency detection is case-insensitive', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('C:\\Tools\\AGENCY.EXE');
+      const id = mgr.newSession('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args[0]).toBe('copilot');
+    });
+
+    it('does not inject `copilot` subcommand for copilot binary', () => {
+      mockPtyModule.spawn.mockClear();
+      const mgr = makeManager('C:\\tools\\copilot.exe');
+      mgr.newSession('/cwd');
+      const [, args] = mockPtyModule.spawn.mock.calls[0];
+      expect(args[0]).not.toBe('copilot');
+      expect(args[0]).toBe('--session-id');
+    });
+  });
+
   describe('warmUp / claimStandby', () => {
     it('warmUp creates a standby session', () => {
       mockPtyModule.spawn.mockClear();

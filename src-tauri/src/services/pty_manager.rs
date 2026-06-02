@@ -87,7 +87,7 @@ impl PtyManager {
             return Err(format!("{} not found at {:?}", pty_host_name, pty_host));
         }
 
-        eprintln!("[eventide] Spawning via pty_host: --resume {} (cwd: {})", session_id, spawn_cwd);
+        eprintln!("[eventide] Spawning via pty_host: --session-id {} (cwd: {})", session_id, spawn_cwd);
 
         #[cfg(target_os = "windows")]
         use std::os::windows::process::CommandExt;
