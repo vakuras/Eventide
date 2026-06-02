@@ -2,7 +2,7 @@
 
 All notable changes to Eventide are documented here.
 
-## [0.7.0] - 2026-06-02
+## [0.7.1] - 2026-06-02
 
 ### Fixed
 - **Session start/resume broken on copilot CLI 1.0.57+** — the underlying `copilot --resume <id>` now only resumes *existing* sessions and rejects pre-generated UUIDs for new sessions. Switched both runtimes to `--session-id <id>`, which per `copilot --help` "Resume an existing session or task by ID, or set the UUID for a new session" — works for both new and resume.
@@ -10,6 +10,18 @@ All notable changes to Eventide are documented here.
 
 ### Tests
 - Added 7 new tests in `pty-manager.test.js` covering the flag name and agency subcommand injection (45/45 passing).
+
+## [0.7.0] - 2026-04-03
+
+### Fixed
+- **Sidebar collapse restore** — sidebar now correctly restores to collapsed state on startup
+- **PTY input delay** — reverted timer-based batching that caused characters to buffer
+- **Update install** — kills PTY sessions before installing to prevent file-in-use errors
+- **Update banner** — polished green card with "Restart to update" button
+
+### Changed
+- **Code quality** — moved regex out of hot loops, replaced panicking unwraps, removed dead code
+- **Removed unused Job Object code** — simplified PTY lifecycle
 
 ## [0.6.9] - 2026-04-05
 
