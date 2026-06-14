@@ -5,6 +5,7 @@ const { deriveSessionState } = require('./session-state');
 const { createTerminalKeyHandler } = require('./keyboard-shortcuts');
 const { collectTerminalSearchMatches } = require('./terminal-search');
 const { resolveSidebarDragWidth } = require('./sidebar-resize');
+const { stripMouseTracking } = require('./pty-data-filter');
 
 // State
 const terminals = new Map();
@@ -616,7 +617,7 @@ async function init() {
   ipcCleanups.push(window.api.onPtyData((sessionId, data) => {
     const entry = terminals.get(sessionId);
     if (entry) {
-      entry.terminal.write(data, () => {
+      entry.terminal.write(stripMouseTracking(data), () => {
         scheduleTerminalViewportSync(sessionId, { refreshSearch: true });
       });
     }
