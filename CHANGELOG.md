@@ -2,6 +2,14 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.7.2] - 2026-06-15
+
+### Fixed
+- **Terminal drag-to-select / `Ctrl+C` copy broken** ([#4](https://github.com/vakuras/Eventide/pull/4)) — Copilot CLI enables xterm mouse-tracking modes (`?1000`, `?1002`, `?1006`, …) on startup, which made xterm.js forward mouse events to the PTY instead of creating a native text selection. `terminal.hasSelection()` was always `false`, so `Ctrl+C` sent SIGINT instead of copying. Added `src/pty-data-filter.js` which strips `ESC [ ? <params> h|l` mouse-mode IDs (`9`, `1000`, `1001`, `1002`, `1003`, `1005`, `1006`, `1015`, `1016`) from PTY output before handing it to `terminal.write()`. Combined sequences like `\x1b[?25;1002h` correctly retain the non-mouse params (`\x1b[?25h`). Right-click and drag-select now work as expected; the existing copy handler in `keyboard-shortcuts.js` starts firing automatically.
+
+### Tests
+- Added 13 unit tests in `test/pty-data-filter.test.js` covering each tracking mode, combined-mode sequences, partial removal preserving non-mouse params, unrelated CSI passthrough, mixed content, and null/undefined/non-string inputs (243/243 non-pre-existing tests passing).
+
 ## [0.7.1] - 2026-06-02
 
 ### Fixed
