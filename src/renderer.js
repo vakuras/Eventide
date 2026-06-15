@@ -3,6 +3,7 @@ const { FitAddon } = require('@xterm/addon-fit');
 const { WebLinksAddon } = require('@xterm/addon-web-links');
 const { deriveSessionState } = require('./session-state');
 const { createTerminalKeyHandler } = require('./keyboard-shortcuts');
+const { createTerminalWheelHandler } = require('./terminal-wheel');
 const { collectTerminalSearchMatches } = require('./terminal-search');
 const { resolveSidebarDragWidth } = require('./sidebar-resize');
 const { stripMouseTracking } = require('./pty-data-filter');
@@ -1616,6 +1617,18 @@ function createTerminal(sessionId) {
   // top of main's current shortcut plumbing instead of replacing it.
   terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(sessionId, terminal, window.api, {
     onInput: (data) => handleSessionPromptInput(sessionId, data)
+  }));
+
+  // Bridge mouse-wheel events to the PTY as SGR-encoded mouse-button
+  // reports (the same format Copilot CLI's TUI consumed before we stripped
+  // mouse tracking in pty-data-filter). Also suppresses xterm.js's default
+  // fallback of translating wheel events into cursor-up/down keys, which
+  // would otherwise corrupt the prompt.
+  terminal.attachCustomWheelEventHandler(createTerminalWheelHandler({
+    terminal,
+    sessionId,
+    api: window.api,
+    wrapper,
   }));
 
   terminals.set(sessionId, {
