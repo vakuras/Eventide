@@ -100,6 +100,41 @@ describe('SessionService', () => {
     });
   });
 
+  describe('listSessions title resolution', () => {
+    it('uses .eventide-title when present (highest priority)', async () => {
+      await createSession('title-custom', 'name: cli-name\nsummary: auto summary', {
+        eventideTitle: 'Manually Renamed',
+      });
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-custom');
+      expect(sess.title).toBe('Manually Renamed');
+    });
+
+    it("honors workspace.yaml `name` (Copilot CLI's /rename) when no .eventide-title", async () => {
+      await createSession('title-cli', 'name: RPs\nsummary: original auto summary');
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-cli');
+      expect(sess.title).toBe('RPs');
+    });
+
+    it('falls back to summary when neither .eventide-title nor name is set', async () => {
+      await createSession('title-summary', 'summary: investigate rollout');
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-summary');
+      expect(sess.title).toBe('investigate rollout');
+    });
+
+    it('does not truncate or sanitize a workspace.yaml `name`', async () => {
+      // Long names from /rename should be treated as user-chosen (no 70-char truncation,
+      // no quote stripping).
+      const longName = 'A very long manually chosen name that exceeds seventy characters for sure indeed';
+      await createSession('title-no-trunc', `name: ${longName}\nsummary: short`);
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-no-trunc');
+      expect(sess.title).toBe(longName);
+    });
+  });
+
   describe('listSessions cwd resolution', () => {
     it('uses .deepsky-cwd override in session listing', async () => {
       await createSession('list-1', 'cwd: /yaml/dir\nsummary: test session', { deepskyCwd: '/override/dir' });
@@ -257,6 +292,30 @@ describe('SessionService', () => {
 
       const matches = await svc.searchSessions('statistics');
       expect(matches.map(match => match.id)).toContain('event-only');
+    });
+
+    it("matches against workspace.yaml `name` (Copilot CLI's /rename)", async () => {
+      await createSession('cli-rename', 'cwd: C:/Dev/Eventide\nname: RPs\nsummary: irrelevant\n', {
+        events: [
+          { type: 'user.message', data: { content: 'No keyword here' } }
+        ]
+      });
+
+      const matches = await svc.searchSessions('rps');
+      expect(matches.map(m => m.id)).toContain('cli-rename');
+      const hit = matches.find(m => m.id === 'cli-rename');
+      expect(hit.occurrences[0].sourceLabel).toBe('title');
+    });
+
+    it('prefers workspace.yaml `name` over `summary` for title matches', async () => {
+      await createSession('name-over-summary', 'name: Manual CLI Name\nsummary: Auto Summary\n');
+
+      // Auto summary should no longer be searchable when name is set.
+      const summaryMiss = await svc.searchSessions('auto');
+      expect(summaryMiss.map(m => m.id)).not.toContain('name-over-summary');
+
+      const nameHit = await svc.searchSessions('manual');
+      expect(nameHit.map(m => m.id)).toContain('name-over-summary');
     });
   });
 

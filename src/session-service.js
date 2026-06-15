@@ -60,6 +60,16 @@ class SessionService {
         // No custom title — fall through to auto-detection
       }
 
+      // Honor Copilot CLI's /rename, which writes to workspace.yaml `name`.
+      // Treated as user-chosen, so cleanup/truncation does not apply.
+      if (!title && typeof meta.name === 'string') {
+        const named = meta.name.trim();
+        if (named) {
+          title = named;
+          isCustomTitle = true;
+        }
+      }
+
       if (!title) {
         title = meta.summary || null;
       }
@@ -135,10 +145,15 @@ class SessionService {
     if (customTitle) {
       return this._collectMatchesFromText(customTitle, needle, { sourceLabel: 'title', maxMatches: 1 });
     }
-    // Fall back to workspace.yaml summary so auto-derived titles are searchable too.
+    // Fall back to workspace.yaml: prefer `name` (Copilot CLI's /rename) over `summary`
+    // (the auto-derived title) so manual renames are searchable wherever they're stored.
     try {
       const yamlContent = await fs.promises.readFile(path.join(sessionDir, 'workspace.yaml'), 'utf8');
       const meta = yaml.load(yamlContent) || {};
+      const named = typeof meta.name === 'string' ? meta.name.trim() : '';
+      if (named) {
+        return this._collectMatchesFromText(named, needle, { sourceLabel: 'title', maxMatches: 1 });
+      }
       const summary = typeof meta.summary === 'string' ? meta.summary.trim() : '';
       if (summary) {
         return this._collectMatchesFromText(summary, needle, { sourceLabel: 'title', maxMatches: 1 });

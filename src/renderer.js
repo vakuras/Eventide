@@ -26,6 +26,7 @@ const sessionLastUsed = new Map();
 let creatingSession = false;
 const ipcCleanups = []; // unsubscribe fns for IPC listeners
 let sidebarSearchResultIds = null;
+let sidebarSearchTitleIds = null;
 let sidebarSearchLoading = false;
 let sidebarSearchTimer = null;
 let sidebarSearchRequestSeq = 0;
@@ -414,6 +415,7 @@ function queueSidebarSearch(query) {
   if (!needle) {
     sidebarSearchLoading = false;
     sidebarSearchResultIds = null;
+    sidebarSearchTitleIds = null;
     renderSessionList();
     return;
   }
@@ -425,9 +427,15 @@ function queueSidebarSearch(query) {
       const results = await window.api.searchSessions(needle);
       if (requestId !== sidebarSearchRequestSeq) return;
       sidebarSearchResultIds = new Set(results.map(result => result.id));
+      sidebarSearchTitleIds = new Set(
+        results
+          .filter(r => Array.isArray(r.occurrences) && r.occurrences.some(o => o && o.sourceLabel === 'title'))
+          .map(r => r.id)
+      );
     } catch {
       if (requestId !== sidebarSearchRequestSeq) return;
       sidebarSearchResultIds = null;
+      sidebarSearchTitleIds = null;
     } finally {
       if (requestId === sidebarSearchRequestSeq) {
         sidebarSearchLoading = false;
@@ -1249,6 +1257,15 @@ function renderSessionList() {
       if (sidebarSearchResultIds && sidebarSearchResultIds.has(s.id)) return true;
       return false;
     });
+
+    // Promote title matches to the top so renames are easy to spot.
+    // Stable sort: within each tier the recency order from above is preserved.
+    const isTitleMatch = (s) => {
+      if (s.title && s.title.toLowerCase().includes(q)) return true;
+      if (sidebarSearchTitleIds && sidebarSearchTitleIds.has(s.id)) return true;
+      return false;
+    };
+    displayed.sort((a, b) => Number(isTitleMatch(b)) - Number(isTitleMatch(a)));
   }
 
   sessionList.innerHTML = '';
