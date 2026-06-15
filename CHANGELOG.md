@@ -2,6 +2,14 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.7.3] - 2026-06-15
+
+### Fixed
+- **Mouse-wheel scrolling cycled prompt history in REPL TUIs** ([#5](https://github.com/vakuras/Eventide/pull/5)) — regression from v0.7.2. With mouse-tracking stripped and the terminal on the alt screen buffer (Copilot CLI's TUI), xterm.js's default wheel handler translated wheel-up/down into cursor-up/down (`\x1b[A` / `\x1b[B`), which Copilot CLI's prompt consumed as arrow keys and cycled input history. Added `src/terminal-wheel.js` which re-implements the wheel→SGR mouse-button bridge ourselves via `attachCustomWheelEventHandler`: synthesizes `\x1b[<64;X;YM` (wheel up) / `\x1b[<65;X;YM` (wheel down), derives 1-based cell coords from the wrapper's bounding rect, caps ticks at 10 per event to prevent trackpad fling floods, and returns `false` to suppress the cursor-key fallback. Drag and click are not synthesized, so native selection and the existing `Ctrl+C` copy handler keep working.
+
+### Tests
+- Added 17 unit tests in `test/terminal-wheel.test.js` covering SGR encoding (buttons 64/65, M terminator), `deltaMode` 0/1/2 conversion, tick capping, zero/missing/non-numeric inputs, multi-tick escape emission, wrapper-based cell-coord derivation, fallback to (1, 1) without a wrapper, and defensive paths (missing api, throwing `writePty`).
+
 ## [0.7.2] - 2026-06-15
 
 ### Fixed
