@@ -2,6 +2,14 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.7.4] - 2026-06-16
+
+### Added
+- **Sidebar search now matches across all title sources** ([#6](https://github.com/vakuras/Eventide/pull/6)) — search previously only scanned `events.jsonl`, so sessions renamed via Eventide's double-click rename (`.eventide-title`) or Copilot CLI's `/rename` slash command (`workspace.yaml` `name`) were unreachable unless the new name also appeared in the transcript. Title resolution now walks `.eventide-title` → `meta.name` → `meta.summary` → events fallback, and `meta.name` is treated as a user-chosen title (no truncation, no quoted-prompt cleanup). The new `_searchTitleForOccurrences` reads the same priority chain and emits a `sourceLabel: 'title'` hit; title matches are prepended to the results so they rank above transcript hits (within the existing 3-occurrence cap).
+
+### Tests
+- Added test coverage in `test/session-service.test.js` for the new title-source resolution and search ranking (final results: 270 pass / 11 pre-existing failures, unchanged).
+
 ## [0.7.3] - 2026-06-15
 
 ### Fixed
