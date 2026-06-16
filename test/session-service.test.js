@@ -26,6 +26,9 @@ async function createSession(id, yamlContent, extras = {}) {
   if (extras.deepskyTitle) {
     await fs.promises.writeFile(path.join(dir, '.deepsky-title'), extras.deepskyTitle, 'utf8');
   }
+  if (extras.eventideTitle) {
+    await fs.promises.writeFile(path.join(dir, '.eventide-title'), extras.eventideTitle, 'utf8');
+  }
   if (extras.events) {
     const lines = extras.events.map(event => JSON.stringify(event)).join('\n') + '\n';
     await fs.promises.writeFile(path.join(dir, 'events.jsonl'), lines, 'utf8');
@@ -94,6 +97,41 @@ describe('SessionService', () => {
       await createSession('sess-empty-file', 'cwd: /yaml/path\nsummary: test', { deepskyCwd: '   ' });
       const cwd = await svc.getCwd('sess-empty-file');
       expect(cwd).toBe('/yaml/path');
+    });
+  });
+
+  describe('listSessions title resolution', () => {
+    it('uses .eventide-title when present (highest priority)', async () => {
+      await createSession('title-custom', 'name: cli-name\nsummary: auto summary', {
+        eventideTitle: 'Manually Renamed',
+      });
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-custom');
+      expect(sess.title).toBe('Manually Renamed');
+    });
+
+    it("honors workspace.yaml `name` (Copilot CLI's /rename) when no .eventide-title", async () => {
+      await createSession('title-cli', 'name: RPs\nsummary: original auto summary');
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-cli');
+      expect(sess.title).toBe('RPs');
+    });
+
+    it('falls back to summary when neither .eventide-title nor name is set', async () => {
+      await createSession('title-summary', 'summary: investigate rollout');
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-summary');
+      expect(sess.title).toBe('investigate rollout');
+    });
+
+    it('does not truncate or sanitize a workspace.yaml `name`', async () => {
+      // Long names from /rename should be treated as user-chosen (no 70-char truncation,
+      // no quote stripping).
+      const longName = 'A very long manually chosen name that exceeds seventy characters for sure indeed';
+      await createSession('title-no-trunc', `name: ${longName}\nsummary: short`);
+      const sessions = await svc.listSessions();
+      const sess = sessions.find(s => s.id === 'title-no-trunc');
+      expect(sess.title).toBe(longName);
     });
   });
 
@@ -197,6 +235,87 @@ describe('SessionService', () => {
 
       const matches = await svc.searchSessions('phantom-keyword');
       expect(matches.map(match => match.id)).not.toContain('search-hidden-tool');
+    });
+
+    it('matches against the manual rename in .eventide-title', async () => {
+      await createSession('renamed', 'summary: irrelevant auto summary', {
+        eventideTitle: "Review Vadim's Recommendation",
+        events: [
+          { type: 'user.message', data: { content: 'No keyword here' } }
+        ]
+      });
+
+      const matches = await svc.searchSessions('vadim');
+      expect(matches.map(match => match.id)).toContain('renamed');
+      const hit = matches.find(m => m.id === 'renamed');
+      expect(hit.preview.toLowerCase()).toContain('vadim');
+      expect(hit.occurrences[0].sourceLabel).toBe('title');
+    });
+
+    it('falls back to workspace.yaml summary when there is no custom title', async () => {
+      await createSession('summary-hit', 'summary: Investigate Phoenix telemetry pipeline', {
+        events: [
+          { type: 'user.message', data: { content: 'No keyword here' } }
+        ]
+      });
+
+      const matches = await svc.searchSessions('phoenix');
+      expect(matches.map(match => match.id)).toContain('summary-hit');
+      const hit = matches.find(m => m.id === 'summary-hit');
+      expect(hit.occurrences[0].sourceLabel).toBe('title');
+    });
+
+    it('prefers .eventide-title over workspace.yaml summary for title matches', async () => {
+      // Custom rename hides the summary — searching for the old summary token should not match
+      // (since the user explicitly renamed the session away from that content).
+      await createSession('renamed-over-summary', 'summary: Original Auto Summary', {
+        eventideTitle: 'Manually Renamed Session',
+        events: [
+          { type: 'user.message', data: { content: 'No keyword here' } }
+        ]
+      });
+
+      const summaryMiss = await svc.searchSessions('original');
+      expect(summaryMiss.map(m => m.id)).not.toContain('renamed-over-summary');
+
+      const titleHit = await svc.searchSessions('renamed');
+      expect(titleHit.map(m => m.id)).toContain('renamed-over-summary');
+    });
+
+    it('still returns event matches when the title does not contain the needle', async () => {
+      await createSession('event-only', 'summary: unrelated title', {
+        eventideTitle: 'Unrelated Title',
+        events: [
+          { type: 'user.message', data: { content: 'Looking at deployment statistics for the session' } }
+        ]
+      });
+
+      const matches = await svc.searchSessions('statistics');
+      expect(matches.map(match => match.id)).toContain('event-only');
+    });
+
+    it("matches against workspace.yaml `name` (Copilot CLI's /rename)", async () => {
+      await createSession('cli-rename', 'cwd: C:/Dev/Eventide\nname: RPs\nsummary: irrelevant\n', {
+        events: [
+          { type: 'user.message', data: { content: 'No keyword here' } }
+        ]
+      });
+
+      const matches = await svc.searchSessions('rps');
+      expect(matches.map(m => m.id)).toContain('cli-rename');
+      const hit = matches.find(m => m.id === 'cli-rename');
+      expect(hit.occurrences[0].sourceLabel).toBe('title');
+    });
+
+    it('prefers workspace.yaml `name` over `summary` for title matches', async () => {
+      await createSession('name-over-summary', 'name: Manual CLI Name\nsummary: Auto Summary\n');
+
+      // Auto summary should no longer be searchable when name is set.
+      const summaryMiss = await svc.searchSessions('auto');
+      expect(summaryMiss.map(m => m.id)).not.toContain('name-over-summary');
+
+      const nameHit = await svc.searchSessions('manual');
+      expect(nameHit.map(m => m.id)).toContain('name-over-summary');
     });
   });
 

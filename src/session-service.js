@@ -60,6 +60,16 @@ class SessionService {
         // No custom title — fall through to auto-detection
       }
 
+      // Honor Copilot CLI's /rename, which writes to workspace.yaml `name`.
+      // Treated as user-chosen, so cleanup/truncation does not apply.
+      if (!title && typeof meta.name === 'string') {
+        const named = meta.name.trim();
+        if (named) {
+          title = named;
+          isCustomTitle = true;
+        }
+      }
+
       if (!title) {
         title = meta.summary || null;
       }
@@ -118,11 +128,40 @@ class SessionService {
     const sessionDir = path.join(this.dir, entry.name);
 
     try {
-      const occurrences = await this._searchEventsForOccurrences(sessionDir, needle);
+      const titleMatches = await this._searchTitleForOccurrences(sessionDir, needle);
+      const remaining = Math.max(0, 3 - titleMatches.length);
+      const eventMatches = remaining > 0
+        ? await this._searchEventsForOccurrences(sessionDir, needle, remaining)
+        : [];
+      const occurrences = [...titleMatches, ...eventMatches];
       return occurrences.length ? { id: entry.name, occurrences, preview: occurrences[0].preview } : null;
     } catch {
       return null;
     }
+  }
+
+  async _searchTitleForOccurrences(sessionDir, needle) {
+    const customTitle = await this._readOptionalTrimmedFile(path.join(sessionDir, '.eventide-title'));
+    if (customTitle) {
+      return this._collectMatchesFromText(customTitle, needle, { sourceLabel: 'title', maxMatches: 1 });
+    }
+    // Fall back to workspace.yaml: prefer `name` (Copilot CLI's /rename) over `summary`
+    // (the auto-derived title) so manual renames are searchable wherever they're stored.
+    try {
+      const yamlContent = await fs.promises.readFile(path.join(sessionDir, 'workspace.yaml'), 'utf8');
+      const meta = yaml.load(yamlContent) || {};
+      const named = typeof meta.name === 'string' ? meta.name.trim() : '';
+      if (named) {
+        return this._collectMatchesFromText(named, needle, { sourceLabel: 'title', maxMatches: 1 });
+      }
+      const summary = typeof meta.summary === 'string' ? meta.summary.trim() : '';
+      if (summary) {
+        return this._collectMatchesFromText(summary, needle, { sourceLabel: 'title', maxMatches: 1 });
+      }
+    } catch {
+      // Missing / unreadable workspace.yaml — fall through with no title match.
+    }
+    return [];
   }
 
   async _readOptionalTrimmedFile(filePath) {
