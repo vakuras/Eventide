@@ -6,6 +6,7 @@ const readline = require('readline');
 class SessionService {
   constructor(sessionStateDir) {
     this.dir = sessionStateDir;
+    this._searchSeq = 0;
   }
 
   async listSessions() {
@@ -26,13 +27,29 @@ class SessionService {
     const needle = String(query || '').trim().toLowerCase();
     if (!needle) return [];
 
+    // Each call bumps the seq so older in-flight scans short-circuit ASAP.
+    const seq = ++this._searchSeq;
+    const isCancelled = () => this._searchSeq !== seq;
+
     const entries = await fs.promises.readdir(this.dir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory());
 
-    const results = await Promise.allSettled(dirs.map(entry => this._searchSessionOccurrences(entry, needle)));
-    return results
-      .filter(r => r.status === 'fulfilled' && r.value !== null)
-      .map(r => r.value);
+    // Cap parallel fs scans so a noisy "no-match" query (which has to read every
+    // events.jsonl end-to-end) cannot saturate the main process and starve PTY
+    // data delivery / other IPC handlers.
+    const CONCURRENCY = 8;
+    const results = [];
+    for (let i = 0; i < dirs.length; i += CONCURRENCY) {
+      if (isCancelled()) return [];
+      const batch = dirs.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.allSettled(
+        batch.map(entry => this._searchSessionOccurrences(entry, needle, isCancelled))
+      );
+      for (const r of batchResults) {
+        if (r.status === 'fulfilled' && r.value !== null) results.push(r.value);
+      }
+    }
+    return isCancelled() ? [] : results;
   }
 
   async getLastUserPrompt(sessionId) {
@@ -124,15 +141,18 @@ class SessionService {
     }
   }
 
-  async _searchSessionOccurrences(entry, needle) {
+  async _searchSessionOccurrences(entry, needle, isCancelled = () => false) {
+    if (isCancelled()) return null;
     const sessionDir = path.join(this.dir, entry.name);
 
     try {
       const titleMatches = await this._searchTitleForOccurrences(sessionDir, needle);
+      if (isCancelled()) return null;
       const remaining = Math.max(0, 3 - titleMatches.length);
       const eventMatches = remaining > 0
-        ? await this._searchEventsForOccurrences(sessionDir, needle, remaining)
+        ? await this._searchEventsForOccurrences(sessionDir, needle, remaining, isCancelled)
         : [];
+      if (isCancelled()) return null;
       const occurrences = [...titleMatches, ...eventMatches];
       return occurrences.length ? { id: entry.name, occurrences, preview: occurrences[0].preview } : null;
     } catch {
@@ -314,7 +334,7 @@ class SessionService {
     }
   }
 
-  async _searchEventsForOccurrences(sessionDir, needle, maxOccurrences = 3) {
+  async _searchEventsForOccurrences(sessionDir, needle, maxOccurrences = 3, isCancelled = () => false) {
     const eventsPath = path.join(sessionDir, 'events.jsonl');
     try {
       await fs.promises.access(eventsPath);
@@ -327,6 +347,7 @@ class SessionService {
       const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
       const occurrences = [];
       let finished = false;
+      let lineCount = 0;
 
       const finish = (value = occurrences) => {
         if (finished) return;
@@ -338,6 +359,13 @@ class SessionService {
 
       rl.on('line', (line) => {
         if (finished) return;
+        // Cancellation check — sample once every 50 lines so the overhead is
+        // negligible but a stale scan returns within a few ms after a new
+        // query arrives.
+        if ((++lineCount & 0x3f) === 0 && isCancelled()) {
+          finish([]);
+          return;
+        }
         try {
           const event = JSON.parse(line);
           const texts = this._extractVisibleEventTexts(event);

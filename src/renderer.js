@@ -442,7 +442,7 @@ function queueSidebarSearch(query) {
         renderSessionList();
       }
     }
-  }, 120);
+  }, 300);
 }
 
 function syncSidebarCollapsedUi() {
