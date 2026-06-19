@@ -294,6 +294,32 @@ describe('SessionService', () => {
       expect(matches.map(match => match.id)).toContain('event-only');
     });
 
+    it('cancels in-flight searches when a newer query starts (returns []), and the newer query completes normally', async () => {
+      // Create enough sessions with substantial events.jsonl bodies that the
+      // first scan can't possibly finish before the second one supersedes it.
+      const longLine = (i) => JSON.stringify({
+        type: 'user.message',
+        data: { content: `Line ${i} ` + 'lorem '.repeat(200) }
+      });
+      for (let s = 0; s < 12; s++) {
+        const lines = [];
+        for (let i = 0; i < 200; i++) lines.push(longLine(i));
+        const dir = path.join(tmpDir, `bulky-${s}`);
+        await fs.promises.mkdir(dir, { recursive: true });
+        await fs.promises.writeFile(path.join(dir, 'workspace.yaml'), 'summary: bulky\n', 'utf8');
+        await fs.promises.writeFile(path.join(dir, 'events.jsonl'), lines.join('\n') + '\n', 'utf8');
+      }
+
+      const stale = svc.searchSessions('zzznomatch');
+      // Yield once so the stale scan can register its seq.
+      await new Promise(r => setImmediate(r));
+      const current = svc.searchSessions('lorem');
+
+      const [staleResult, currentResult] = await Promise.all([stale, current]);
+      expect(staleResult).toEqual([]);
+      expect(currentResult.length).toBeGreaterThan(0);
+    });
+
     it("matches against workspace.yaml `name` (Copilot CLI's /rename)", async () => {
       await createSession('cli-rename', 'cwd: C:/Dev/Eventide\nname: RPs\nsummary: irrelevant\n', {
         events: [
