@@ -1,9 +1,11 @@
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
@@ -16,9 +18,10 @@ pub struct ActiveSession {
 }
 
 struct PtySession {
+    master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
-    kill_flag: Arc<Mutex<bool>>,
-    alive: bool,
+    child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
+    alive: Arc<AtomicBool>,
     opened_at: Instant,
     last_data_at: Option<Instant>,
 }
@@ -28,6 +31,25 @@ pub struct PtyManager {
     app_handle: AppHandle,
     sessions: Mutex<HashMap<String, PtySession>>,
     max_concurrent: Mutex<u32>,
+}
+
+/// Kill a process and all of its children.
+#[cfg(target_os = "windows")]
+fn kill_process_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let _ = Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_process_tree(pid: u32) {
+    use std::process::Command;
+    let _ = Command::new("pkill").args(["-TERM", "-P", &pid.to_string()]).output();
+    let _ = Command::new("kill").args(["-TERM", &pid.to_string()]).output();
 }
 
 impl PtyManager {
@@ -45,7 +67,7 @@ impl PtyManager {
         {
             let sessions = self.sessions.lock().unwrap();
             if let Some(entry) = sessions.get(session_id) {
-                if entry.alive {
+                if entry.alive.load(Ordering::SeqCst) {
                     return Ok(session_id.to_string());
                 }
             }
@@ -54,7 +76,11 @@ impl PtyManager {
         // Clean dead entry
         {
             let mut sessions = self.sessions.lock().unwrap();
-            if sessions.get(session_id).map(|e| !e.alive).unwrap_or(false) {
+            if sessions
+                .get(session_id)
+                .map(|e| !e.alive.load(Ordering::SeqCst))
+                .unwrap_or(false)
+            {
                 sessions.remove(session_id);
             }
         }
@@ -70,189 +96,174 @@ impl PtyManager {
     }
 
     fn spawn_session(&self, session_id: &str, cwd: Option<&str>) -> Result<String, String> {
-        let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".to_string());
+        let home = dirs::home_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| ".".to_string());
         let spawn_cwd = cwd.unwrap_or(&home);
 
-        // Spawn via pty_host helper — a console-mode exe that creates ConPTY.
-        // Tauri GUI apps can't create ConPTY children directly (0xC0000142).
-        use std::process::{Command, Stdio};
+        // Spawn copilot directly via portable-pty (ConPTY on Windows). No
+        // helper binary is needed — a GUI-subsystem Tauri process can host
+        // ConPTY children directly.
+        let cols: u16 = 120;
+        let rows: u16 = 40;
 
-        let self_exe = std::env::current_exe().map_err(|e| format!("Can't find self exe: {}", e))?;
-        let pty_host_name = if cfg!(target_os = "windows") { "pty_host.exe" } else { "pty_host" };
-        let pty_host = self_exe.parent()
-            .ok_or_else(|| format!("Executable has no parent directory: {:?}", self_exe))?
-            .join(pty_host_name);
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-        if !pty_host.exists() {
-            return Err(format!("{} not found at {:?}", pty_host_name, pty_host));
+        let mut cmd = CommandBuilder::new(&self.copilot_path);
+        // When using agency, we need the "copilot" subcommand before the flags
+        let binary_name = std::path::Path::new(&self.copilot_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if binary_name == "agency" || binary_name == "agency.exe" {
+            cmd.args(["copilot", "--session-id", session_id, "--yolo"]);
+        } else {
+            cmd.args(["--session-id", session_id, "--yolo"]);
         }
+        cmd.cwd(spawn_cwd);
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+        cmd.env("FORCE_COLOR", "3");
 
-        eprintln!("[eventide] Spawning via pty_host: --session-id {} (cwd: {})", session_id, spawn_cwd);
+        eprintln!(
+            "[eventide] Spawning copilot directly: --session-id {} (cwd: {})",
+            session_id, spawn_cwd
+        );
 
-        #[cfg(target_os = "windows")]
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let child = pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn copilot: {}", e))?;
 
-        let mut cmd = Command::new(&pty_host);
-        cmd.args([&self.copilot_path, session_id, spawn_cwd, "120", "40"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        // Release the slave handle so the child owns the only reference.
+        drop(pair.slave);
 
-        #[cfg(target_os = "windows")]
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|e| format!("Failed to clone PTY reader: {}", e))?;
 
-        let mut child = cmd.spawn()
-            .map_err(|e| format!("Failed to spawn pty_host: {}", e))?;
+        let alive = Arc::new(AtomicBool::new(true));
+        let child = Arc::new(Mutex::new(child));
 
-        let stdin = child.stdin.take()
-            .ok_or("Failed to get stdin")?;
-        let stdout = child.stdout.take()
-            .ok_or("Failed to get stdout")?;
-        let stderr = child.stderr.take()
-            .ok_or("Failed to get stderr")?;
-
-        let kill_flag = Arc::new(Mutex::new(false));
-        let kill_flag_clone = kill_flag.clone();
-
-        let session_id_owned = session_id.to_string();
-        let app_handle = self.app_handle.clone();
-
-        // Stdout reader thread
-        let sid_for_reader = session_id_owned.clone();
-        let kill_for_reader = kill_flag.clone();
-        let app_for_stdout = app_handle.clone();
+        // Reader thread → emit pty:data
+        let sid_for_reader = session_id.to_string();
+        let alive_for_reader = alive.clone();
+        let app_for_data = self.app_handle.clone();
         thread::spawn(move || {
-            use std::io::Read;
-            let mut reader = stdout;
             let mut buf = [0u8; 16384];
             loop {
-                if *kill_for_reader.lock().unwrap() {
-                    break;
-                }
                 match reader.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let _ = app_for_stdout.emit("pty:data", serde_json::json!({
-                            "sessionId": sid_for_reader,
-                            "data": data,
-                        }));
+                        let _ = app_for_data.emit(
+                            "pty:data",
+                            serde_json::json!({
+                                "sessionId": sid_for_reader,
+                                "data": data,
+                            }),
+                        );
                     }
                     Err(_) => break,
                 }
             }
+            alive_for_reader.store(false, Ordering::SeqCst);
         });
 
-        // Stderr reader thread — merge into same data stream
-        let sid_for_stderr = session_id_owned.clone();
-        let kill_for_stderr = kill_flag.clone();
-        let app_for_stderr = app_handle.clone();
+        // Exit watcher thread → emit pty:exit
+        let sid_for_exit = session_id.to_string();
+        let alive_for_exit = alive.clone();
+        let child_for_exit = child.clone();
+        let app_for_exit = self.app_handle.clone();
         thread::spawn(move || {
-            use std::io::Read;
-            let mut reader = stderr;
-            let mut buf = [0u8; 4096];
-            loop {
-                if *kill_for_stderr.lock().unwrap() {
-                    break;
+            let exit_code = {
+                let mut guard = child_for_exit.lock().unwrap();
+                match guard.wait() {
+                    Ok(status) => status.exit_code() as i32,
+                    Err(_) => -1,
                 }
-                match reader.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let _ = app_for_stderr.emit("pty:data", serde_json::json!({
-                            "sessionId": sid_for_stderr,
-                            "data": data,
-                        }));
-                    }
-                    Err(_) => break,
-                }
-            }
-        });
-
-        // Exit watcher thread
-        let sid_for_exit = session_id_owned.clone();
-        let app_handle_exit = self.app_handle.clone();
-        thread::spawn(move || {
-            let status = child.wait();
-            let exit_code = status
-                .map(|s| s.code().unwrap_or(-1))
-                .unwrap_or(-1);
-
-            eprintln!("[eventide] Process exited: session={} code={}", sid_for_exit, exit_code);
-
-            *kill_flag_clone.lock().unwrap() = true;
-
-            let _ = app_handle_exit.emit("pty:exit", serde_json::json!({
-                "sessionId": sid_for_exit,
-                "exitCode": exit_code,
-            }));
+            };
+            alive_for_exit.store(false, Ordering::SeqCst);
+            eprintln!(
+                "[eventide] copilot exited: session={} code={}",
+                sid_for_exit, exit_code
+            );
+            let _ = app_for_exit.emit(
+                "pty:exit",
+                serde_json::json!({
+                    "sessionId": sid_for_exit,
+                    "exitCode": exit_code,
+                }),
+            );
         });
 
         let entry = PtySession {
-            writer: Box::new(stdin),
-            kill_flag: kill_flag.clone(),
-            alive: true,
+            master: pair.master,
+            writer,
+            child,
+            alive,
             opened_at: Instant::now(),
             last_data_at: None,
         };
 
-        self.sessions.lock().unwrap().insert(session_id.to_string(), entry);
+        self.sessions
+            .lock()
+            .unwrap()
+            .insert(session_id.to_string(), entry);
         Ok(session_id.to_string())
     }
 
     pub fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
-        // Clone the writer handle outside the lock to avoid blocking other operations
-        let writer_result = {
-            let mut sessions = self.sessions.lock().unwrap();
-            if let Some(entry) = sessions.get_mut(session_id) {
-                if entry.alive {
-                    Some(entry.kill_flag.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
-        if writer_result.is_none() {
-            return Ok(());
-        }
-
-        // Write with the sessions lock held briefly — write_all on a pipe shouldn't
-        // block for small payloads (keystrokes), but if it does, we hold the lock.
-        // For a more robust solution, we'd use async I/O.
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(entry) = sessions.get_mut(session_id) {
-            if entry.alive {
+            if entry.alive.load(Ordering::SeqCst) {
                 if entry.writer.write_all(data.as_bytes()).is_err() {
-                    entry.alive = false;
+                    entry.alive.store(false, Ordering::SeqCst);
                     return Err("Write failed — session may have exited".to_string());
                 }
                 let _ = entry.writer.flush();
+                entry.last_data_at = Some(Instant::now());
             }
         }
         Ok(())
     }
 
     pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
-        // Send resize escape sequence to pty_host: \x1b]666;resize;<cols>;<rows>\x07
-        let mut sessions = self.sessions.lock().unwrap();
-        if let Some(entry) = sessions.get_mut(session_id) {
-            let seq = format!("\x1b]666;resize;{};{}\x07", cols, rows);
-            let _ = entry.writer.write_all(seq.as_bytes());
-            let _ = entry.writer.flush();
+        let sessions = self.sessions.lock().unwrap();
+        if let Some(entry) = sessions.get(session_id) {
+            let _ = entry.master.resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            });
         }
         Ok(())
     }
 
     pub fn kill(&self, session_id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
-        if let Some(entry) = sessions.get_mut(session_id) {
-            if entry.alive {
-                *entry.kill_flag.lock().unwrap() = true;
-                entry.alive = false;
+        if let Some(entry) = sessions.get(session_id) {
+            entry.alive.store(false, Ordering::SeqCst);
+            if let Ok(mut child) = entry.child.lock() {
+                let pid = child.process_id();
+                let _ = child.kill();
+                if let Some(pid) = pid {
+                    kill_process_tree(pid);
+                }
             }
         }
         sessions.remove(session_id);
@@ -264,7 +275,7 @@ impl PtyManager {
         let now = Instant::now();
         sessions
             .iter()
-            .filter(|(_, e)| e.alive)
+            .filter(|(_, e)| e.alive.load(Ordering::SeqCst))
             .map(|(id, e)| ActiveSession {
                 id: id.clone(),
                 opened_at: e.opened_at.elapsed().as_millis() as i64,
@@ -287,7 +298,7 @@ impl PtyManager {
 
         let mut alive: Vec<(String, Instant)> = sessions
             .iter()
-            .filter(|(_, e)| e.alive)
+            .filter(|(_, e)| e.alive.load(Ordering::SeqCst))
             .map(|(id, e)| (id.clone(), e.opened_at))
             .collect();
 
@@ -300,9 +311,15 @@ impl PtyManager {
 
         let to_evict = alive.len() - (max as usize) + 1;
         for (id, _) in alive.into_iter().take(to_evict) {
-            if let Some(entry) = sessions.get_mut(&id) {
-                *entry.kill_flag.lock().unwrap() = true;
-                entry.alive = false;
+            if let Some(entry) = sessions.get(&id) {
+                entry.alive.store(false, Ordering::SeqCst);
+                if let Ok(mut child) = entry.child.lock() {
+                    let pid = child.process_id();
+                    let _ = child.kill();
+                    if let Some(pid) = pid {
+                        kill_process_tree(pid);
+                    }
+                }
             }
             sessions.remove(&id);
         }

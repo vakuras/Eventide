@@ -25,7 +25,7 @@ Eventide ships as **two installers** from a single codebase — pick the one tha
 |---|---|---|
 | **Size** | ~150 MB | ~12 MB |
 | **Backend** | Node.js | Rust |
-| **Terminal** | node-pty | ConPTY (pty_host.exe) |
+| **Terminal** | node-pty | ConPTY (portable-pty) |
 | **Renderer** | Chromium | WebView2 |
 | **Auto-update** | electron-updater | tauri-plugin-updater |
 | **Installer** | `Eventide-Electron-Setup-X.X.X.exe` | `Eventide-Tauri-Setup-X.X.X.exe` |
@@ -96,8 +96,7 @@ src-tauri/              # Tauri backend (Rust)
 ├── src/
 │   ├── lib.rs          # Tauri command registration
 │   ├── commands/       # IPC command handlers
-│   ├── services/       # 7 Rust services (settings, sessions, PTY, tags, resources, status, notifications)
-│   └── bin/pty_host.rs # ConPTY helper binary
+│   └── services/       # 7 Rust services (settings, sessions, PTY, tags, resources, status, notifications)
 └── tauri.conf.json
 
 resources/              # Shared icons and images (both runtimes)
