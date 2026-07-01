@@ -2,6 +2,11 @@
 
 All notable changes to Eventide are documented here.
 
+## [0.8.0] - 2026-07-01
+
+### Changed
+- **Tauri terminal now spawns Copilot directly via `portable-pty` — the `pty_host.exe` helper binary is gone.** Previously the Tauri backend shelled out to a separate console-subsystem helper (`src-tauri/src/bin/pty_host.rs`) to host the ConPTY child, based on the belief that a GUI-subsystem process couldn't create ConPTY children (`0xC0000142`). A spike (validated against [SideX](https://github.com/Sidenai/sidex)'s direct-spawn approach) proved this wrong: `pty_manager.rs` now opens the PTY and calls `spawn_command` in-process, streaming output over the same `pty:data` / `pty:exit` events and applying resize via `MasterPty::resize` directly (no escape-sequence protocol). Session kill now tears down the whole process tree (`taskkill /F /T` on Windows), fixing orphaned/locked `copilot`/`agency` processes after close. Net result: one fewer binary to build, sign, and ship, and cleaner process lifecycle. The public `PtyManager` API and all Tauri commands are unchanged; the Electron runtime (node-pty) is unaffected.
+
 ## [0.7.4] - 2026-06-16
 
 ### Added

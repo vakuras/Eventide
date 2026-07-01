@@ -143,7 +143,7 @@ window.api = {
   },
   installUpdate: async () => {
     try {
-      // Kill all active PTY sessions to release pty_host.exe
+      // Kill all active PTY sessions to release the copilot processes
       try {
         const active = await invoke('get_active_sessions');
         for (const id of active) {
